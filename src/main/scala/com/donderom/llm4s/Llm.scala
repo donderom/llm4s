@@ -15,31 +15,23 @@ private class SlincLlm private[llm4s] (val ctx: Ptr[Any]):
   def generate(prompt: String, params: LlmParams): LazyList[String] =
     val lastTokens = new ArrayDeque[Int](ctxSize)
 
-    def promptTokens(ids: Array[Int], remaining: Int): LazyList[String] =
-      if remaining == 0 then LazyList.empty
-      else
-        val id = ids(ids.size - remaining)
-        lastTokens.append(id)
-        decode(id) #:: promptTokens(ids, remaining - 1)
-
     def tokens(remaining: Int, evaluated: Int): LazyList[String] =
-      def evaluate(past: Int, start: Int): Int =
-        val batch = lastTokens.slice(start, params.batchSize + start)
-        if batch.isEmpty then past
-        else
-          eval(batch.toArray, past, params.threads)
-          val newPast = past + batch.size
-          if batch.size < params.batchSize then newPast
-          else evaluate(past = newPast, start = params.batchSize + start)
-
       if remaining != 0 then
         val newPast = if evaluated + 1 > ctxSize then
           val start = ctxSize - ((evaluated - params.keepTokens) / 2) - 1
-          evaluate(past = math.max(1, params.keepTokens), start = start)
+          evaluate(
+            ids = lastTokens.slice(start, lastTokens.size).toArray,
+            past = math.max(1, params.keepTokens),
+            params = params.context
+          )
         else
           val start =
             if lastTokens.size == ctxSize then ctxSize - 1 else evaluated
-          evaluate(past = evaluated, start = start)
+          evaluate(
+            ids = lastTokens.slice(start, lastTokens.size).toArray,
+            past = evaluated,
+            params = params.context
+          )
 
         val repeatLastTokens =
           if params.sampling.repeatLastTokens < 0 then ctxSize
@@ -53,11 +45,12 @@ private class SlincLlm private[llm4s] (val ctx: Ptr[Any]):
 
         if lastTokens.lastOption.fold(true)(_ != eosToken) then
           decode(id) #:: tokens(remaining = remaining - 1, evaluated = newPast)
-        else close()
-      else close()
+        else close(params.suffix)
+      else close(params.suffix)
 
     val ids = encode(" " + prompt)
-    promptTokens(ids, ids.size) #::: tokens(
+    val promptTokens = LazyList.from(ids).tapEach(lastTokens.append).map(decode)
+    promptTokens #::: tokens(
       remaining = params.predictTokens,
       evaluated = 0
     )
@@ -84,14 +77,20 @@ private class SlincLlm private[llm4s] (val ctx: Ptr[Any]):
   def decode(token: Int): String =
     ptr2str(llama.llama_token_to_str(ctx = ctx, token = token))
 
-  def eval(batch: Array[Int], past: Int, threads: Int): Unit = Scope.confined:
-    llama.llama_eval(
-      ctx = ctx,
-      tokens = Ptr.copy(batch.toArray),
-      n_tokens = batch.size,
-      n_past = past,
-      n_threads = threads
-    )
+  def evaluate(ids: Array[Int], past: Int, params: ContextParams): Int =
+    if ids.isEmpty then past
+    else
+      val batches = ids.grouped(params.batchSize)
+      Scope.confined:
+        for (batch, n) <- batches.zipWithIndex do
+          llama.llama_eval(
+            ctx = ctx,
+            tokens = Ptr.copy(batch),
+            n_tokens = batch.size,
+            n_past = past + n * params.batchSize,
+            n_threads = params.threads
+          )
+      past + ids.size
 
   def sample(repeatTokens: Array[Int], params: SamplingParams): Int =
     Scope.confined:
@@ -193,9 +192,9 @@ private class SlincLlm private[llm4s] (val ctx: Ptr[Any]):
             )
             llama.llama_sample_token(ctx = ctx, candidates = candidates)
 
-  def close(): LazyList[String] =
+  def close(suffix: Option[String]): LazyList[String] =
     llama.llama_free(ctx)
-    LazyList.empty
+    suffix.fold(LazyList.empty)(LazyList(_))
 
   private def ptr2str(ptr: Ptr[Byte]): String =
     var i = 0
@@ -211,7 +210,7 @@ trait Llm(val modelPath: Path):
     generate(prompt, params)
 
 object Llm:
-  def apply(lib: Path, model: Path, params: LlmParams): Llm =
+  def apply(lib: Path, model: Path, params: ContextParams): Llm =
     val binding = Try:
       System.load(lib.toAbsolutePath.toString)
       FSet.instance[Llama]
@@ -254,7 +253,7 @@ object Llm:
             defaultParams <- defaultParams
           yield llama.llama_new_context_with_model(
             model = llm,
-            params = llamaParams(defaultParams, params)
+            params = llamaParams(defaultParams, params.context)
           )
           ctx.filter(_ != null).map(new SlincLlm(_).generate(prompt, params))
 
@@ -267,7 +266,7 @@ object Llm:
 
   private def llamaParams(
       defaultParams: llama_context_params,
-      params: LlmParams
+      params: ContextParams
   ): llama_context_params =
     defaultParams.copy(
       seed = params.seed,

@@ -2,6 +2,20 @@ package com.donderom.llm4s
 
 import java.nio.file.Path
 
+case class ContextParams(
+    contextSize: Int = 512,
+    batchSize: Int = 512,
+    gpuLayers: Int = 0,
+    mainGpu: Int = 0,
+    lowVram: Boolean = false,
+    seed: Int = -1,
+    f16: Boolean = true,
+    mmap: Boolean = true,
+    mlock: Boolean = false,
+    threads: Int = 1,
+    lora: LoraParams = LoraParams()
+)
+
 case class LoraParams(
     adapter: Option[Path] = None,
     base: Option[Path] = None
@@ -34,18 +48,9 @@ case class SamplingParams(
 )
 
 case class LlmParams(
-    contextSize: Int = 512,
-    batchSize: Int = 512,
-    gpuLayers: Int = 0,
-    mainGpu: Int = 0,
-    lowVram: Boolean = false,
-    seed: Int = -1,
-    f16: Boolean = true,
-    mmap: Boolean = true,
-    mlock: Boolean = false,
-    threads: Int = 1,
+    context: ContextParams = ContextParams(),
+    sampling: SamplingParams = SamplingParams(),
     predictTokens: Int = -1,
     keepTokens: Int = 0,
-    lora: LoraParams = LoraParams(),
-    sampling: SamplingParams = SamplingParams()
+    suffix: Option[String] = None
 )
