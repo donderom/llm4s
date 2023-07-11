@@ -52,5 +52,6 @@ case class LlmParams(
     sampling: SamplingParams = SamplingParams(),
     predictTokens: Int = -1,
     keepTokens: Int = 0,
-    suffix: Option[String] = None
+    suffix: Option[String] = None,
+    echo: Boolean = true
 )
