@@ -35,7 +35,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
           else params.sampling.repeatLastTokens
         val lastRepeat = math.min(lastTokens.size, repeatLastTokens)
         val repeatTokens = lastTokens.takeRight(lastRepeat).toArray
-        val id = sample(repeatTokens, params.sampling)
+        val id = sample(repeatTokens, params.sampling, params.logitBias)
 
         if lastTokens.size == ctxSize then lastTokens.remove(0)
         lastTokens.append(id)
@@ -92,9 +92,14 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
           )
       past + ids.size
 
-  def sample(repeatTokens: Array[Int], params: SamplingParams): Int =
+  def sample(
+      repeatTokens: Array[Int],
+      params: SamplingParams,
+      logitBias: Map[Int, Float]
+  ): Int =
     Scope.confined:
-      val logits = llama.llama_get_logits(ctx).asArray(vocabSize)
+      val logits = llama.llama_get_logits(ctx).asArray(vocabSize).unsafeArray
+      logitBias.foreach((token, bias) => logits(token) = bias)
 
       val tokenData = Array.tabulate[llama_token_data](vocabSize)(tokenId =>
         llama_token_data(id = tokenId, logit = logits(tokenId), p = 0.0)

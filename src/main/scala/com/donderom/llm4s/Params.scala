@@ -52,6 +52,7 @@ case class LlmParams(
     sampling: SamplingParams = SamplingParams(),
     predictTokens: Int = -1,
     keepTokens: Int = 0,
+    logitBias: Map[Int, Float] = Map(),
     suffix: Option[String] = None,
     echo: Boolean = true
 )
