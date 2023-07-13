@@ -8,9 +8,29 @@ import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.{FSet, Ptr, Scope}
 
 trait Llm(val modelPath: Path):
+  opaque type Offset = Int
+  object Offset:
+    def apply(value: Int): Offset = value
+  extension (offset: Offset) def toInt: Int = offset
+
   def generate(prompt: String, params: LlmParams): Try[LazyList[String]]
 
   def close(): Unit
+
+  def text(prompt: String, params: LlmParams, stop: List[String]): Try[String] =
+    generate(prompt, params).map: stream =>
+      val result = StringBuilder()
+
+      def build(tokens: LazyList[String]): Option[Offset] = tokens match
+        case LazyList() => None
+        case h #:: t =>
+          result ++= h
+          stop.find(result.endsWith) match
+            case Some(stopAt) => Option(Offset(stopAt.size))
+            case None         => build(t)
+
+      build(stream).fold(result.toString): offset =>
+        result.dropRight(offset.toInt).toString + params.suffix.getOrElse("")
 
   def apply(prompt: String, params: LlmParams): Try[LazyList[String]] =
     generate(prompt, params)
@@ -35,7 +55,7 @@ object Llm:
         params = llamaParams(defaultParams, params)
       )
 
-      params.lora.adapter.fold(baseModel)(loraAdapter =>
+      params.lora.adapter.fold(baseModel): loraAdapter =>
         val err =
           for
             llama <- binding
@@ -48,7 +68,6 @@ object Llm:
             n_threads = params.threads
           )
         err.filter(_ == 0).flatMap(_ => baseModel)
-      )
 
     new Llm(model) {
       def generate(prompt: String, params: LlmParams): Try[LazyList[String]] =
@@ -61,7 +80,7 @@ object Llm:
             model = llm,
             params = llamaParams(defaultParams, params.context)
           )
-          ctx.filter(_ != null).map(new SlincLlm(_).generate(prompt, params))
+          ctx.filter(_ != null).map(SlincLlm(_).generate(prompt, params))
 
       def close(): Unit =
         for

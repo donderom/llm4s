@@ -44,8 +44,9 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
           decode(id) #:: tokens(remaining = remaining - 1, evaluated = newPast)
         else close(params.suffix)
       else close(params.suffix)
+    end tokens
 
-    val ids = encode(" " + prompt)
+    val ids = encode(" " + prompt, addBos = true)
     if params.echo then
       val promptTokens =
         LazyList.from(ids).tapEach(lastTokens.append).map(decode)
@@ -54,23 +55,23 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
       ids.foreach(lastTokens.append)
       val evaluated = evaluate(ids = ids, past = 0, params = params.context)
       tokens(remaining = params.predictTokens, evaluated = evaluated)
+  end generate
 
   lazy val ctxSize: Int = llama.llama_n_ctx(ctx)
   lazy val eosToken: Int = llama.llama_token_eos()
   lazy val vocabSize: Int = llama.llama_n_vocab(ctx)
 
-  val addBos: Int = 1
-
-  def encode(prompt: String): Array[Int] =
-    val res = new Array[Int](prompt.size + addBos)
+  def encode(text: String, addBos: Boolean): Array[Int] =
+    val bos = if addBos then 1 else 0
+    val res = new Array[Int](text.size + bos)
     Scope.confined:
       val tokens = Ptr.copy(res)
       val numTokens = llama.llama_tokenize(
         ctx = ctx,
-        text = Ptr.copy(prompt),
+        text = Ptr.copy(text),
         tokens = tokens,
         n_max_tokens = res.size,
-        add_bos = addBos.toByte
+        add_bos = bos.toByte
       )
       tokens.asArray(math.min(numTokens, ctxSize)).unsafeArray
 
@@ -196,6 +197,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
               temp = params.temp
             )
             llama.llama_sample_token(ctx = ctx, candidates = candidates)
+  end sample
 
   def close(suffix: Option[String]): LazyList[String] =
     llama.llama_free(ctx)

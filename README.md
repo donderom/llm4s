@@ -8,7 +8,7 @@ Add Slinc runtime and llm4s to your `build.sbt`:
 
 ```scala
 libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.5.0"
-libraryDependencies += "com.donderom" %% "llm4s" % "0.1.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.2.0"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -22,7 +22,7 @@ Version compatibility:
 
 | llm4s | Slinc runtime |     Scala |    JDK |                  llama.cpp (commit hash) |
 |------:|--------------:|----------:|-------:|-----------------------------------------:|
-| 0.1.* |         0.5.0 | 3.3.0-RC3 | 17, 19 | 447ccbe8c39332fcdd0d98a041b6e2ff6f06219d |
+|  0.1+ |         0.5.0 | 3.3.0-RC3 | 17, 19 | 447ccbe8c39332fcdd0d98a041b6e2ff6f06219d |
 
 
 ### Usage
@@ -34,10 +34,11 @@ import com.donderom.llm4s.*
 
 val lib = Paths.get("path/to/libllama.so")
 val model = Paths.get("path/to/ggml-model.bin")
-val params = LlmParams(threads = 6, seed = 1337)
-val llm = Llm(lib = lib, model = model, params = params)
+val contextParams = ContextParams(threads = 6, seed = 1337)
+val llm = Llm(lib = lib, model = model, params = contextParams)
 
 val prompt = "Deep learning is "
+val params = LlmParams(context = contextParams)
 
 // To print generation as it goes
 llm(prompt, params).foreach: stream =>
@@ -46,6 +47,9 @@ llm(prompt, params).foreach: stream =>
 
 // Or build a string
 llm(prompt, params).map(_.foldLeft(new StringBuilder)(_ ++= _).toString)
+
+// Or use a function that supports stop sequences
+llm.text(prompt, params, List("neural network", "self-driving cars"))
 
 llm.close()
 ```
