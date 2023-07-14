@@ -62,7 +62,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
   lazy val vocabSize: Int = llama.llama_n_vocab(ctx)
 
   def encode(text: String, addBos: Boolean): Array[Int] =
-    val bos = if addBos then 1 else 0
+    val bos = addBos.toByte
     val res = new Array[Int](text.size + bos)
     Scope.confined:
       val tokens = Ptr.copy(res)
@@ -71,7 +71,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
         text = Ptr.copy(text),
         tokens = tokens,
         n_max_tokens = res.size,
-        add_bos = bos.toByte
+        add_bos = bos
       )
       tokens.asArray(math.min(numTokens, ctxSize)).unsafeArray
 

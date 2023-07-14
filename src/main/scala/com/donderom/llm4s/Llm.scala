@@ -7,6 +7,8 @@ import scala.util.Try
 import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.{FSet, Ptr, Scope}
 
+extension (bool: Boolean) def toByte: Byte = if bool then 1 else 0
+
 trait Llm(val modelPath: Path):
   opaque type Offset = Int
   object Offset:
@@ -41,7 +43,7 @@ object Llm:
       System.load(lib.toAbsolutePath.toString)
       FSet.instance[Llama]
 
-    binding.foreach(_.llama_init_backend())
+    binding.foreach(_.llama_backend_init(params.numa.toByte))
 
     val defaultParams = binding.map: llama =>
       llama.llama_context_default_params()
@@ -86,7 +88,9 @@ object Llm:
         for
           llama <- binding
           llm <- llm
-        do llama.llama_free_model(llm)
+        do
+          llama.llama_free_model(llm)
+          llama.llama_backend_free()
     }
 
   private def llamaParams(
@@ -99,11 +103,11 @@ object Llm:
       n_batch = params.batchSize,
       n_gpu_layers = params.gpuLayers,
       main_gpu = params.mainGpu,
-      low_vram = if params.lowVram then 1 else 0,
-      f16_kv = if params.f16 then 1 else 0,
+      low_vram = params.lowVram.toByte,
+      f16_kv = params.f16.toByte,
       logits_all = 0,
       vocab_only = 0,
-      use_mmap = if params.mmap then 1 else 0,
-      use_mlock = if params.mlock then 1 else 0,
+      use_mmap = params.mmap.toByte,
+      use_mlock = params.mlock.toByte,
       embedding = 0
     )

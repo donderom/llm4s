@@ -59,6 +59,18 @@ case class llama_model_quantize_params(
     quantize_output_tensor: Byte
 ) derives Struct
 
+case class llama_timings(
+    t_start_ms: Double,
+    t_end_ms: Double,
+    t_load_ms: Double,
+    t_sample_ms: Double,
+    t_p_eval_ms: Double,
+    t_eval_ms: Double,
+    n_sample: Int,
+    n_p_eval: Int,
+    n_eval: Int
+) derives Struct
+
 trait Llama derives FSet:
   type LlamaToken = CInt
   type Ctx = Ptr[Any]
@@ -70,7 +82,9 @@ trait Llama derives FSet:
   def llama_mmap_supported(): Byte
   def llama_mlock_supported(): Byte
 
-  def llama_init_backend(): Unit
+  def llama_backend_init(numa: Byte): Unit
+
+  def llama_backend_free(): Unit
 
   def llama_time_us(): CInt
 
@@ -134,6 +148,14 @@ trait Llama derives FSet:
       n_threads: CInt
   ): CInt
 
+  def llama_eval_embd(
+      ctx: Ctx,
+      embd: Ptr[Float],
+      n_tokens: Int,
+      n_past: Int,
+      n_threads: Int
+  ): CInt
+
   def llama_eval_export(ctx: Ctx, fname: Ptr[CChar]): CInt
 
   def llama_tokenize(
@@ -144,12 +166,31 @@ trait Llama derives FSet:
       add_bos: Byte
   ): CInt
 
+  def llama_tokenize_with_model(
+      model: Model,
+      text: Ptr[Char],
+      tokens: Ptr[LlamaToken],
+      n_max_tokens: Int,
+      add_bos: Byte
+  ): CInt
+
   def llama_n_vocab(ctx: Ctx): CInt
   def llama_n_ctx(ctx: Ctx): CInt
   def llama_n_embd(ctx: Ctx): CInt
 
+  def llama_n_vocab_from_model(model: Model): CInt
+  def llama_n_ctx_from_model(model: Model): CInt
+  def llama_n_embd_from_model(model: Model): CInt
+
   def llama_get_vocab(
       ctx: Ctx,
+      strings: Ptr[Ptr[CChar]],
+      scores: Ptr[Float],
+      capacity: Int
+  ): CInt
+
+  def llama_get_vocab_from_model(
+      model: Model,
       strings: Ptr[Ptr[CChar]],
       scores: Ptr[Float],
       capacity: Int
@@ -160,6 +201,7 @@ trait Llama derives FSet:
   def llama_get_embeddings(ctx: Ctx): Ptr[CFloat]
 
   def llama_token_to_str(ctx: Ctx, token: LlamaToken): Ptr[CChar]
+  def llama_token_to_str_with_model(model: Model, token: LlamaToken): Ptr[CChar]
 
   def llama_token_bos(): LlamaToken
   def llama_token_eos(): LlamaToken
@@ -180,6 +222,14 @@ trait Llama derives FSet:
       last_tokens_size: SizeT,
       alpha_frequency: Float,
       alpha_presence: Float
+  ): Unit
+
+  def llama_sample_classifier_free_guidance(
+      ctx: Ctx,
+      candidates: Ptr[llama_token_data_array],
+      guidance_ctx: Ctx,
+      scale: Float,
+      smooth_factor: Float
   ): Unit
 
   def llama_sample_softmax(
@@ -248,6 +298,7 @@ trait Llama derives FSet:
       candidates: Ptr[llama_token_data_array]
   ): LlamaToken
 
+  def llama_get_timings(ctx: Ctx): llama_timings
   def llama_print_timings(ctx: Ctx): Unit
   def llama_reset_timings(ctx: Ctx): Unit
 

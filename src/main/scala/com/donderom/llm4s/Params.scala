@@ -13,7 +13,8 @@ case class ContextParams(
     mmap: Boolean = true,
     mlock: Boolean = false,
     threads: Int = 1,
-    lora: LoraParams = LoraParams()
+    lora: LoraParams = LoraParams(),
+    numa: Boolean = false
 )
 
 case class LoraParams(
