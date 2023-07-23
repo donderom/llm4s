@@ -7,9 +7,12 @@ case class llama_context_params(
     seed: Int,
     n_ctx: Int,
     n_batch: Int,
+    n_gqa: Int,
     n_gpu_layers: Int,
     main_gpu: Int,
-    tensor_split: SetSizeArray[Float, 1],
+    tensor_split: Ptr[Float],
+    rope_freq_base: Float,
+    rope_freq_scale: Float,
     progress_callback: Ptr[(Float, Unit) => Unit],
     progress_callback_user_data: Ptr[Unit],
     low_vram: Byte,
@@ -75,6 +78,8 @@ trait Llama derives FSet:
   type LlamaToken = CInt
   type Ctx = Ptr[Any]
   type Model = Ptr[Any]
+
+  def llama_max_devices(): CInt
 
   def llama_context_default_params(): llama_context_params
   def llama_model_quantize_default_params(): llama_model_quantize_params
@@ -228,8 +233,7 @@ trait Llama derives FSet:
       ctx: Ctx,
       candidates: Ptr[llama_token_data_array],
       guidance_ctx: Ctx,
-      scale: Float,
-      smooth_factor: Float
+      scale: Float
   ): Unit
 
   def llama_sample_softmax(

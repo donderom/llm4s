@@ -8,7 +8,7 @@ Add Slinc runtime and llm4s to your `build.sbt`:
 
 ```scala
 libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.5.0"
-libraryDependencies += "com.donderom" %% "llm4s" % "0.3.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.4.0"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -22,10 +22,9 @@ Version compatibility:
 
 | llm4s | Slinc runtime |     Scala |    JDK |                           llama.cpp (commit hash) |
 |------:|--------------:|----------:|-------:|--------------------------------------------------:|
+|  0.4+ |           --- |       --- |    --- | 70d26ac3883009946e737525506fa88f52727132 (Jul 23) |
 |  0.3+ |           --- |       --- |    --- | a6803cab946c817fb7aaf2a40b317f5d3e373bd1 (Jul 14) |
 |  0.1+ |         0.5.0 | 3.3.0-RC3 | 17, 19 | 447ccbe8c39332fcdd0d98a041b6e2ff6f06219d (Jun 25) |
-
-
 
 ### Usage
 
