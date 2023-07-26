@@ -55,5 +55,6 @@ case class LlmParams(
     keepTokens: Int = 0,
     logitBias: Map[Int, Float] = Map(),
     suffix: Option[String] = None,
-    echo: Boolean = true
+    echo: Boolean = true,
+    stopSeqs: List[String] = Nil
 )

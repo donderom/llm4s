@@ -10,7 +10,7 @@ Add Slinc runtime and llm4s to your `build.sbt`:
 
 ```scala
 libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.5.0"
-libraryDependencies += "com.donderom" %% "llm4s" % "0.4.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.5.0"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -49,10 +49,7 @@ llm(prompt, params).foreach: stream =>
     print(token)
 
 // Or build a string
-llm(prompt, params).map(_.foldLeft(new StringBuilder)(_ ++= _).toString)
-
-// Or use a function that supports stop sequences
-llm.text(prompt, params, List("neural network", "self-driving cars"))
+llm(prompt, params).foreach(stream => println(stream.mkString))
 
 llm.close()
 ```

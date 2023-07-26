@@ -11,8 +11,13 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
   def generate(prompt: String, params: LlmParams): LazyList[String] =
     val lastTokens = new ArrayDeque[Int](ctxSize)
+    val stop = Stop.Acc(params.stopSeqs)
 
-    def tokens(remaining: Int, evaluated: Int): LazyList[String] =
+    def tokens(
+        remaining: Int,
+        evaluated: Int,
+        state: Stop.State
+    ): LazyList[String] =
       if remaining != 0 then
         val newPast = if evaluated + 1 > ctxSize then
           val start = ctxSize - ((evaluated - params.keepTokens) / 2) - 1
@@ -41,20 +46,25 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
         lastTokens.append(id)
 
         if lastTokens.lastOption.fold(true)(_ != eosToken) then
-          decode(id) #:: tokens(remaining = remaining - 1, evaluated = newPast)
-        else close(params.suffix)
-      else close(params.suffix)
+          val gen = tokens(remaining - 1, newPast, _)
+          stop.step(decode(id), state) match
+            case Stop.Action.Cont(state)                => gen(state)
+            case Stop.Action.Emit(chunk: String, state) => chunk #:: gen(state)
+            case Stop.Action.Emit(chunk: Vector[String], state) =>
+              LazyList.from(chunk) #::: gen(state)
+            case Stop.Action.Stop(chunk) =>
+              LazyList.from(params.suffix.fold(chunk)(chunk :+ _))
+        else close(state.deferred(params.suffix))
+      else close(state.deferred(params.suffix))
     end tokens
 
+    val gen = tokens(remaining = params.predictTokens, _, state = Stop.State())
     val ids = encode(" " + prompt, addBos = true)
     if params.echo then
-      val promptTokens =
-        LazyList.from(ids).tapEach(lastTokens.append).map(decode)
-      promptTokens #::: tokens(remaining = params.predictTokens, evaluated = 0)
+      LazyList.from(ids).tapEach(lastTokens.append).map(decode) #::: gen(0)
     else
       ids.foreach(lastTokens.append)
-      val evaluated = evaluate(ids = ids, past = 0, params = params.context)
-      tokens(remaining = params.predictTokens, evaluated = evaluated)
+      gen(evaluate(ids = ids, past = 0, params = params.context))
   end generate
 
   lazy val ctxSize: Int = llama.llama_n_ctx(ctx)
@@ -102,9 +112,9 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
       val logits = llama.llama_get_logits(ctx).asArray(vocabSize).unsafeArray
       logitBias.foreach((token, bias) => logits(token) = bias)
 
-      val tokenData = Array.tabulate[llama_token_data](vocabSize)(tokenId =>
+      val tokenData = Array.tabulate[llama_token_data](vocabSize): tokenId =>
         llama_token_data(id = tokenId, logit = logits(tokenId), p = 0.0)
-      )
+
       val candidates = Ptr.copy(
         llama_token_data_array(
           data = Ptr.copy(tokenData),
@@ -134,74 +144,73 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
       if params.temp <= 0 then
         llama.llama_sample_token_greedy(ctx = ctx, candidates = candidates)
       else
-        params.mirostat
-          .collect:
-            case mirostat @ Mirostat.Params(Mirostat.V1, tau, eta, m) =>
-              llama.llama_sample_temperature(
-                ctx = ctx,
-                candidates = candidates,
-                temp = params.temp
-              )
-              llama.llama_sample_token_mirostat(
-                ctx = ctx,
-                candidates = candidates,
-                tau = tau,
-                eta = eta,
-                m = m,
-                mu = Ptr.copy(mirostat.mu)
-              )
-
-            case mirostat @ Mirostat.Params(Mirostat.V2, tau, eta, _) =>
-              llama.llama_sample_temperature(
-                ctx = ctx,
-                candidates = candidates,
-                temp = params.temp
-              )
-              llama.llama_sample_token_mirostat_v2(
-                ctx = ctx,
-                candidates = candidates,
-                tau = tau,
-                eta = eta,
-                mu = Ptr.copy(mirostat.mu)
-              )
-          .getOrElse:
-            val topK = params.topK.filter(_ > 0).getOrElse(vocabSize)
-            val minKeep = SizeT(1.toShort)
-            llama.llama_sample_top_k(
-              ctx = ctx,
-              candidates = candidates,
-              k = topK,
-              min_keep = minKeep
-            )
-            llama.llama_sample_tail_free(
-              ctx = ctx,
-              candidates = candidates,
-              z = params.tfsZ,
-              min_keep = minKeep
-            )
-            llama.llama_sample_typical(
-              ctx = ctx,
-              candidates = candidates,
-              p = params.typicalP,
-              min_keep = minKeep
-            )
-            llama.llama_sample_top_p(
-              ctx = ctx,
-              candidates = candidates,
-              p = params.topP,
-              min_keep = minKeep
-            )
+        params.mirostat.collect:
+          case mirostat @ Mirostat.Params(Mirostat.V1, tau, eta, m) =>
             llama.llama_sample_temperature(
               ctx = ctx,
               candidates = candidates,
               temp = params.temp
             )
-            llama.llama_sample_token(ctx = ctx, candidates = candidates)
+            llama.llama_sample_token_mirostat(
+              ctx = ctx,
+              candidates = candidates,
+              tau = tau,
+              eta = eta,
+              m = m,
+              mu = Ptr.copy(mirostat.mu)
+            )
+
+          case mirostat @ Mirostat.Params(Mirostat.V2, tau, eta, _) =>
+            llama.llama_sample_temperature(
+              ctx = ctx,
+              candidates = candidates,
+              temp = params.temp
+            )
+            llama.llama_sample_token_mirostat_v2(
+              ctx = ctx,
+              candidates = candidates,
+              tau = tau,
+              eta = eta,
+              mu = Ptr.copy(mirostat.mu)
+            )
+        .getOrElse:
+          val topK = params.topK.filter(_ > 0).getOrElse(vocabSize)
+          val minKeep = SizeT(1.toShort)
+          llama.llama_sample_top_k(
+            ctx = ctx,
+            candidates = candidates,
+            k = topK,
+            min_keep = minKeep
+          )
+          llama.llama_sample_tail_free(
+            ctx = ctx,
+            candidates = candidates,
+            z = params.tfsZ,
+            min_keep = minKeep
+          )
+          llama.llama_sample_typical(
+            ctx = ctx,
+            candidates = candidates,
+            p = params.typicalP,
+            min_keep = minKeep
+          )
+          llama.llama_sample_top_p(
+            ctx = ctx,
+            candidates = candidates,
+            p = params.topP,
+            min_keep = minKeep
+          )
+          llama.llama_sample_temperature(
+            ctx = ctx,
+            candidates = candidates,
+            temp = params.temp
+          )
+          llama.llama_sample_token(ctx = ctx, candidates = candidates)
   end sample
 
-  def close(suffix: Option[String]): LazyList[String] =
+  def close(suffix: Vector[String]): LazyList[String] =
     llama.llama_free(ctx)
-    suffix.fold(LazyList.empty)(LazyList(_))
+    LazyList.from(suffix)
 
   private def ptr2str(ptr: Ptr[Byte]): String =
     var i = 0

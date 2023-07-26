@@ -10,29 +10,9 @@ import fr.hammons.slinc.{FSet, Ptr, Scope}
 extension (bool: Boolean) def toByte: Byte = if bool then 1 else 0
 
 trait Llm(val modelPath: Path):
-  opaque type Offset = Int
-  object Offset:
-    def apply(value: Int): Offset = value
-  extension (offset: Offset) def toInt: Int = offset
-
   def generate(prompt: String, params: LlmParams): Try[LazyList[String]]
 
   def close(): Unit
-
-  def text(prompt: String, params: LlmParams, stop: List[String]): Try[String] =
-    generate(prompt, params).map: stream =>
-      val result = StringBuilder()
-
-      def build(tokens: LazyList[String]): Option[Offset] = tokens match
-        case LazyList() => None
-        case h #:: t =>
-          result ++= h
-          stop.find(result.endsWith) match
-            case Some(stopAt) => Option(Offset(stopAt.size))
-            case None         => build(t)
-
-      build(stream).fold(result.toString): offset =>
-        result.dropRight(offset.toInt).toString + params.suffix.getOrElse("")
 
   def apply(prompt: String, params: LlmParams): Try[LazyList[String]] =
     generate(prompt, params)
@@ -65,8 +45,8 @@ object Llm:
           yield llama.llama_model_apply_lora_from_file(
             model = llm,
             path_lora = Ptr.copy(loraAdapter.toAbsolutePath.toString),
-            path_base_model =
-              Ptr.copy(params.lora.base.fold("")(_.toAbsolutePath.toString)),
+            path_base_model = Ptr
+              .copy(params.lora.base.fold("")(_.toAbsolutePath.toString)),
             n_threads = params.threads
           )
         err.filter(_ == 0).flatMap(_ => baseModel)
