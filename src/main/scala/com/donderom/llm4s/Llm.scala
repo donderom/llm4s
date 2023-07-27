@@ -5,7 +5,7 @@ import java.nio.file.Path
 import scala.util.Try
 
 import fr.hammons.slinc.runtime.given
-import fr.hammons.slinc.{FSet, Ptr, Scope}
+import fr.hammons.slinc.{FSet, Ptr, Scope, Slinc}
 
 extension (bool: Boolean) def toByte: Byte = if bool then 1 else 0
 
@@ -42,11 +42,12 @@ object Llm:
           for
             llama <- binding
             llm <- baseModel
+            loraBase = params.lora.base.fold(Slinc.getRuntime().Null): base =>
+              Ptr.copy(base.toAbsolutePath.toString)
           yield llama.llama_model_apply_lora_from_file(
             model = llm,
             path_lora = Ptr.copy(loraAdapter.toAbsolutePath.toString),
-            path_base_model = Ptr
-              .copy(params.lora.base.fold("")(_.toAbsolutePath.toString)),
+            path_base_model = loraBase,
             n_threads = params.threads
           )
         err.filter(_ == 0).flatMap(_ => baseModel)
