@@ -8,6 +8,7 @@ case class llama_context_params(
     n_ctx: Int,
     n_batch: Int,
     n_gqa: Int,
+    rms_norm_eps: Float,
     n_gpu_layers: Int,
     main_gpu: Int,
     tensor_split: Ptr[Float],
@@ -16,6 +17,7 @@ case class llama_context_params(
     progress_callback: Ptr[(Float, Unit) => Unit],
     progress_callback_user_data: Ptr[Unit],
     low_vram: Byte,
+    mul_mat_q: Byte,
     f16_kv: Byte,
     logits_all: Byte,
     vocab_only: Byte,
@@ -24,11 +26,7 @@ case class llama_context_params(
     embedding: Byte
 ) derives Struct
 
-case class llama_token_data(
-    id: Int,
-    logit: Float,
-    p: Float
-) derives Struct
+case class llama_token_data(id: Int, logit: Float, p: Float) derives Struct
 
 case class llama_token_data_array(
     data: Ptr[llama_token_data],
@@ -62,6 +60,8 @@ case class llama_model_quantize_params(
     quantize_output_tensor: Byte
 ) derives Struct
 
+case class llama_grammar_element(elementType: Int, value: Int) derives Struct
+
 case class llama_timings(
     t_start_ms: Double,
     t_end_ms: Double,
@@ -78,6 +78,7 @@ trait Llama derives FSet:
   type LlamaToken = CInt
   type Ctx = Ptr[Any]
   type Model = Ptr[Any]
+  type Grammar = Ptr[Any]
 
   def llama_max_devices(): CInt
 
@@ -212,6 +213,13 @@ trait Llama derives FSet:
   def llama_token_eos(): LlamaToken
   def llama_token_nl(): LlamaToken
 
+  def llama_grammar_init(
+      rules: Ptr[Ptr[llama_grammar_element]],
+      n_rules: SizeT,
+      start_rule_index: SizeT
+  ): Grammar
+  def llama_grammar_free(grammar: Grammar): Unit
+
   def llama_sample_repetition_penalty(
       ctx: Ctx,
       candidates: Ptr[llama_token_data_array],
@@ -275,6 +283,12 @@ trait Llama derives FSet:
       temp: CFloat
   ): Unit
 
+  def llama_sample_grammar(
+      ctx: Ctx,
+      candidates: Ptr[llama_token_data_array],
+      grammar: Grammar
+  ): Unit
+
   def llama_sample_token_mirostat(
       ctx: Ctx,
       candidates: Ptr[llama_token_data_array],
@@ -301,6 +315,12 @@ trait Llama derives FSet:
       ctx: Ctx,
       candidates: Ptr[llama_token_data_array]
   ): LlamaToken
+
+  def llama_grammar_accept_token(
+      ctx: Ctx,
+      grammar: Grammar,
+      token: LlamaToken
+  ): Unit
 
   def llama_get_timings(ctx: Ctx): llama_timings
   def llama_print_timings(ctx: Ctx): Unit
