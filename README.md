@@ -38,9 +38,13 @@ import com.donderom.llm4s.*
 System.load("path/to/libllama.so")
 val model = Paths.get("path/to/ggml-model.bin")
 val contextParams = ContextParams(threads = 6)
-val llm = Llm(model = model, params = contextParams)
-
 val prompt = "Deep learning is "
+```
+
+#### Completion
+
+```scala
+val llm = Llm(model = model, params = contextParams)
 val params = LlmParams(context = contextParams, predictTokens = 256)
 
 // To print generation as it goes
@@ -57,15 +61,8 @@ llm.close()
 #### Embeddings
 
 ```scala
-import java.nio.file.Paths
-import com.donderom.llm4s.*
-
-System.load("path/to/libllama.so")
-val model = Paths.get("path/to/ggml-model.bin")
-val params = ContextParams(threads = 6)
-val embedding = Embedding(model = model, params = params)
-val prompt = "Deep learning is "
-embedding(prompt, params).foreach: embeddings =>
+val embedding = Embedding(model = model, params = contextParams)
+embedding(prompt, contextParams).foreach: embeddings =>
   embeddings.foreach: embd =>
     print(embd)
     print(' ')
