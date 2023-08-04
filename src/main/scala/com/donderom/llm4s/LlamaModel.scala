@@ -53,14 +53,14 @@ trait LlamaModel:
       llm: Try[Model],
       contextParams: ContextParams
   ): Try[Llama.Ctx] =
-    val ctx = for
+    for
       llama <- binding
       llm <- llm
-    yield llama.llama_new_context_with_model(
-      model = llm.repr,
-      params = llamaParams(llm.params, contextParams)
-    )
-    ctx.filter(_ != null)
+      ctx = llama.llama_new_context_with_model(
+        model = llm.repr,
+        params = llamaParams(llm.params, contextParams)
+      ) if ctx != Slinc.getRuntime().Null
+    yield ctx
 
   def close(llm: Try[Model]): Unit =
     for
