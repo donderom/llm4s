@@ -74,11 +74,14 @@ case class llama_timings(
     n_eval: Int
 ) derives Struct
 
-trait Llama derives FSet:
+object Llama:
   type LlamaToken = CInt
   type Ctx = Ptr[Any]
   type Model = Ptr[Any]
   type Grammar = Ptr[Any]
+
+trait Llama derives FSet:
+  import Llama._
 
   def llama_max_devices(): CInt
 

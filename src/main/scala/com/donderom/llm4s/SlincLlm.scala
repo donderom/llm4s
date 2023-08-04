@@ -59,7 +59,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
     end tokens
 
     val gen = tokens(remaining = params.predictTokens, _, state = Stop.State())
-    val ids = encode(" " + prompt, addBos = true)
+    val ids = encode(prompt)
     if params.echo then
       LazyList.from(ids).tapEach(lastTokens.append).map(decode) #::: gen(0)
     else
@@ -67,9 +67,19 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
       gen(evaluate(ids = ids, past = 0, params = params.context))
   end generate
 
+  def embeddings(prompt: String, params: ContextParams): Array[Float] =
+    val ids = encode(prompt)
+    val _ = evaluate(ids, 0, params)
+    val size = llama.llama_n_embd(ctx)
+    val embeddings = llama.llama_get_embeddings(ctx).asArray(size).unsafeArray
+    llama.llama_free(ctx)
+    embeddings
+
   lazy val ctxSize: Int = llama.llama_n_ctx(ctx)
   lazy val eosToken: Int = llama.llama_token_eos()
   lazy val vocabSize: Int = llama.llama_n_vocab(ctx)
+
+  def encode(prompt: String): Array[Int] = encode(" " + prompt, true)
 
   def encode(text: String, addBos: Boolean): Array[Int] =
     val bos = addBos.toByte

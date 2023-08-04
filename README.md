@@ -10,7 +10,7 @@ Add Slinc runtime and llm4s to your `build.sbt`:
 
 ```scala
 libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.5.0"
-libraryDependencies += "com.donderom" %% "llm4s" % "0.6.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.7.0"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -33,16 +33,15 @@ Version compatibility:
 
 ```scala
 import java.nio.file.Paths
-
 import com.donderom.llm4s.*
 
-val lib = Paths.get("path/to/libllama.so")
+System.load("path/to/libllama.so")
 val model = Paths.get("path/to/ggml-model.bin")
-val contextParams = ContextParams(threads = 6, seed = 1337)
-val llm = Llm(lib = lib, model = model, params = contextParams)
+val contextParams = ContextParams(threads = 6)
+val llm = Llm(model = model, params = contextParams)
 
 val prompt = "Deep learning is "
-val params = LlmParams(context = contextParams)
+val params = LlmParams(context = contextParams, predictTokens = 256)
 
 // To print generation as it goes
 llm(prompt, params).foreach: stream =>
@@ -53,4 +52,22 @@ llm(prompt, params).foreach: stream =>
 llm(prompt, params).foreach(stream => println(stream.mkString))
 
 llm.close()
+```
+
+#### Embeddings
+
+```scala
+import java.nio.file.Paths
+import com.donderom.llm4s.*
+
+System.load("path/to/libllama.so")
+val model = Paths.get("path/to/ggml-model.bin")
+val params = ContextParams(threads = 6)
+val embedding = Embedding(model = model, params = params)
+val prompt = "Deep learning is "
+embedding(prompt, params).foreach: embeddings =>
+  embeddings.foreach: embd =>
+    print(embd)
+    print(' ')
+embedding.close()
 ```
