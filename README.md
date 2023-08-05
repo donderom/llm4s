@@ -10,7 +10,7 @@ Add Slinc runtime and llm4s to your `build.sbt`:
 
 ```scala
 libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.5.0"
-libraryDependencies += "com.donderom" %% "llm4s" % "0.7.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.7.1"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
