@@ -2,7 +2,14 @@ package com.donderom.llm4s
 
 import java.nio.file.Path
 
-case class ContextParams(
+final case class LoraParams(
+    adapter: Option[Path] = None,
+    base: Option[Path] = None
+)
+
+final case class RopeParams(freqBase: Float = 10000.0f, freqScale: Float = 1.0f)
+
+final case class ContextParams(
     contextSize: Int = 512,
     batchSize: Int = 512,
     gpuLayers: Int = 0,
@@ -14,12 +21,8 @@ case class ContextParams(
     mlock: Boolean = false,
     threads: Int = 1,
     lora: LoraParams = LoraParams(),
-    numa: Boolean = false
-)
-
-case class LoraParams(
-    adapter: Option[Path] = None,
-    base: Option[Path] = None
+    numa: Boolean = false,
+    rope: RopeParams = RopeParams()
 )
 
 object Mirostat:
@@ -27,7 +30,7 @@ object Mirostat:
   case object V1 extends Version
   case object V2 extends Version
 
-  case class Params(
+  final case class Params(
       version: Version,
       tau: Float = 5.0f,
       eta: Float = .1f,
@@ -35,7 +38,7 @@ object Mirostat:
   ):
     val mu: Float = 2.0f * tau
 
-case class SamplingParams(
+final case class SamplingParams(
     temp: Float = .80f,
     repeatLastTokens: Int = 64,
     repeatPenalty: Float = 1.10f,
@@ -48,7 +51,7 @@ case class SamplingParams(
     topP: Float = .95f
 )
 
-case class LlmParams(
+final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: SamplingParams = SamplingParams(),
     predictTokens: Int = -1,

@@ -3,7 +3,7 @@ package com.donderom.llm4s
 import fr.hammons.slinc.types.*
 import fr.hammons.slinc.*
 
-case class llama_context_params(
+final case class llama_context_params(
     seed: Int,
     n_ctx: Int,
     n_batch: Int,
@@ -26,9 +26,10 @@ case class llama_context_params(
     embedding: Byte
 ) derives Struct
 
-case class llama_token_data(id: Int, logit: Float, p: Float) derives Struct
+final case class llama_token_data(id: Int, logit: Float, p: Float)
+    derives Struct
 
-case class llama_token_data_array(
+final case class llama_token_data_array(
     data: Ptr[llama_token_data],
     size: SizeT,
     sorted: Byte
@@ -53,16 +54,17 @@ enum LlamaFtype(val code: Int):
   case LLAMA_FTYPE_MOSTLY_Q5_K_M extends LlamaFtype(17)
   case LLAMA_FTYPE_MOSTLY_Q6_K extends LlamaFtype(18)
 
-case class llama_model_quantize_params(
+final case class llama_model_quantize_params(
     nthread: Int,
     ftype: Int,
     allow_requantize: Byte,
     quantize_output_tensor: Byte
 ) derives Struct
 
-case class llama_grammar_element(elementType: Int, value: Int) derives Struct
+final case class llama_grammar_element(elementType: Int, value: Int)
+    derives Struct
 
-case class llama_timings(
+final case class llama_timings(
     t_start_ms: Double,
     t_end_ms: Double,
     t_load_ms: Double,

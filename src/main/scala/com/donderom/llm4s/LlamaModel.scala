@@ -80,6 +80,8 @@ trait LlamaModel:
       n_batch = params.batchSize,
       n_gpu_layers = params.gpuLayers,
       main_gpu = params.mainGpu,
+      rope_freq_base = params.rope.freqBase,
+      rope_freq_scale = params.rope.freqScale,
       low_vram = params.lowVram.toByte,
       f16_kv = params.f16.toByte,
       logits_all = 0,
