@@ -63,6 +63,9 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
     stream(Array("zero", "oops"), List("oo")) should contain only ("zer")
     stream(Array("buzz", "word"), List("zw")) should contain only ("buz")
 
+  it should "handle unicode tokens" in:
+    stream(Array(",", " ", "😍"), List("😍")) should contain only (",", " ")
+
   private def stream(
       tokens: Array[String],
       stopSeqs: List[String]

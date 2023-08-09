@@ -1,5 +1,8 @@
 package com.donderom.llm4s
 
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+
 import scala.collection.mutable.ArrayDeque
 
 import fr.hammons.slinc.runtime.given
@@ -9,6 +12,8 @@ import fr.hammons.slinc.{FSet, Ptr, Scope}
 private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
   val llama = FSet.instance[Llama]
 
+  lazy val decoder = StandardCharsets.UTF_8.newDecoder
+
   def generate(prompt: String, params: LlmParams): LazyList[String] =
     val lastTokens = new ArrayDeque[Int](ctxSize)
     val stop = Stop.Acc(params.stopSeqs)
@@ -16,6 +21,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
     def tokens(
         remaining: Int,
         evaluated: Int,
+        partialBytes: Array[Byte],
         state: Stop.State
     ): LazyList[String] =
       if remaining != 0 then
@@ -46,26 +52,36 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
         lastTokens.append(id)
 
         if lastTokens.lastOption.fold(true)(_ != eosToken) then
-          val gen = tokens(remaining - 1, newPast, _)
-          stop.step(decode(id), state) match
-            case Stop.Action.Cont(state)                => gen(state)
-            case Stop.Action.Emit(chunk: String, state) => chunk #:: gen(state)
-            case Stop.Action.Emit(chunk: Vector[String], state) =>
-              LazyList.from(chunk) #::: gen(state)
-            case Stop.Action.Stop(chunk) =>
-              LazyList.from(params.suffix.fold(chunk)(chunk :+ _))
+          decode(id, partialBytes) match
+            case partial: Array[Byte] =>
+              tokens(remaining - 1, newPast, partial, state)
+            case token: String =>
+              val gen = tokens(remaining - 1, newPast, Array(), _)
+              stop.step(token, state) match
+                case Stop.Action.Cont(state) => gen(state)
+                case Stop.Action.Emit(chunk: String, state) =>
+                  chunk #:: gen(state)
+                case Stop.Action.Emit(chunk: Vector[String], state) =>
+                  LazyList.from(chunk) #::: gen(state)
+                case Stop.Action.Stop(chunk) =>
+                  LazyList.from(params.suffix.fold(chunk)(chunk :+ _))
         else close(state.deferred(params.suffix))
       else close(state.deferred(params.suffix))
     end tokens
 
-    val gen = tokens(remaining = params.predictTokens, _, state = Stop.State())
     val ids = encode(prompt)
-    if params.echo then
-      LazyList.from(ids).tapEach(lastTokens.append).map(decode) #::: gen(0)
-    else
-      ids.foreach(lastTokens.append)
-      gen(evaluate(ids = ids, past = 0, params = params.context))
+    ids.foreach(lastTokens.append)
+    val gen = tokens(params.predictTokens, _, Array(), Stop.State())
+    if params.echo then promptTokens(ids, Array()) #::: gen(0)
+    else gen(evaluate(ids = ids, past = 0, params = params.context))
   end generate
+
+  def promptTokens(ids: Array[Int], pending: Array[Byte]): LazyList[String] =
+    if ids.isEmpty then LazyList.empty
+    else
+      decode(ids.head, pending) match
+        case token: String        => token #:: promptTokens(ids.tail, Array())
+        case partial: Array[Byte] => promptTokens(ids.tail, partial)
 
   def embeddings(prompt: String, params: ContextParams): Array[Float] =
     val ids = encode(prompt)
@@ -83,20 +99,26 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
   def encode(text: String, addBos: Boolean): Array[Int] =
     val bos = addBos.toByte
-    val res = new Array[Int](text.size + bos)
+    val bytes = text.getBytes(StandardCharsets.UTF_8)
+    val res = new Array[Int](bytes.size + bos)
     Scope.confined:
       val tokens = Ptr.copy(res)
       val numTokens = llama.llama_tokenize(
         ctx = ctx,
-        text = Ptr.copy(text),
+        text = Ptr.copy(bytes),
         tokens = tokens,
         n_max_tokens = res.size,
         add_bos = bos
       )
       tokens.asArray(math.min(numTokens, ctxSize)).unsafeArray
 
-  def decode(token: Int): String =
-    ptr2str(llama.llama_token_to_str(ctx = ctx, token = token))
+  def decode(token: Int, pending: Array[Byte]): String | Array[Byte] =
+    val tokenPtr = llama.llama_token_to_str(ctx = ctx, token = token)
+    var i = 0
+    while (!tokenPtr(i) != 0) do i += 1
+    val bytes = Array.concat(pending, tokenPtr.asArray(i).unsafeArray)
+    try decoder.decode(ByteBuffer.wrap(bytes)).toString
+    catch case _ => bytes
 
   def evaluate(ids: Array[Int], past: Int, params: ContextParams): Int =
     if ids.isEmpty then past
@@ -221,8 +243,3 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
   def close(suffix: Vector[String]): LazyList[String] =
     llama.llama_free(ctx)
     LazyList.from(suffix)
-
-  private def ptr2str(ptr: Ptr[Byte]): String =
-    var i = 0
-    while (!ptr(i) != 0) do i += 1
-    String(ptr.asArray(i).unsafeArray, "UTF-8")
