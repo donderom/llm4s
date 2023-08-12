@@ -48,7 +48,8 @@ final case class SamplingParams(
     topK: Option[Int] = Some(40),
     tfsZ: Float = 1.0f,
     typicalP: Float = 1.0f,
-    topP: Float = .95f
+    topP: Float = .95f,
+    logprobs: Int = 0
 )
 
 final case class LlmParams(

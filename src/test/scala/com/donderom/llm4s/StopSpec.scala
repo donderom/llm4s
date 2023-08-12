@@ -1,10 +1,9 @@
 package com.donderom.llm4s
 
-import org.scalatest._
-import flatspec._
-import matchers._
+import org.scalatest.*
+import flatspec.*
+import matchers.*
 
-import Stop._
 
 class StopSpec extends AnyFlatSpec with should.Matchers:
   val defaultTokens =
@@ -70,16 +69,17 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
       tokens: Array[String],
       stopSeqs: List[String]
   ): LazyList[String] =
-    val stopAcc = Stop.Acc(stopSeqs)
-    def gen(remaining: Int, state: State): LazyList[String] =
+    val stop = Stop.Acc[Token](stopSeqs)
+    import stop.*
+    def gen(remaining: Int, state: Stop.State[Token]): LazyList[String] =
       if remaining != 0 then
         val token = tokens(tokens.size - remaining)
-        stopAcc.step(token, state) match
+        stop.step(Token(token), state) match
           case Action.Cont(state) => gen(remaining - 1, state)
-          case Action.Emit(chunk: String, state) =>
-            chunk #:: gen(remaining - 1, state)
-          case Action.Emit(chunk: Vector[String], state) =>
-            LazyList.from(chunk) #::: gen(remaining - 1, state)
-          case Action.Stop(chunk) => LazyList.from(chunk)
-      else LazyList.from(state.deferred(None))
-    gen(tokens.size, state = State())
+          case Action.Emit(chunk: Token, state) =>
+            chunk.show #:: gen(remaining - 1, state)
+          case Action.Emit(chunk: Vector[Token], state) =>
+            LazyList.from(chunk.map(_.show)) #::: gen(remaining - 1, state)
+          case Action.Stop(chunk) => LazyList.from(chunk.map(_.show))
+      else LazyList.from(state.deferred(None).map(_.show))
+    gen(tokens.size, state = Stop.State())
