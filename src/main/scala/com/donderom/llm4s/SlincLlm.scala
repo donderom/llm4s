@@ -264,7 +264,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
     if num > 0 then
       val log = (td: llama_token_data) => math.log(td.p)
-      val logprobs = data.asArray(num).unsafeArray.map: td =>
+      val cap = math.min(num, vocabSize)
+      val logprobs = data.asArray(cap).unsafeArray.map: td =>
         Logprob(tokenValue(td.id), log(td))
       val current = LazyList.range(0, vocabSize).map(!data(_)).find(_.id == id)
       val logprob = Logprob(tokenValue(id), current.fold(.0)(log))
