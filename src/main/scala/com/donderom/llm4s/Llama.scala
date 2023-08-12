@@ -83,7 +83,7 @@ object Llama:
   type Grammar = Ptr[Any]
 
 trait Llama derives FSet:
-  import Llama._
+  import Llama.*
 
   def llama_max_devices(): CInt
 
