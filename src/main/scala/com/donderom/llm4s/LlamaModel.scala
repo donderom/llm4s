@@ -22,7 +22,7 @@ trait LlamaModel:
     val defaultParams = binding.map: llama =>
       llama.llama_context_default_params()
 
-    Scope.confined:
+    Scope.global:
       val baseModel = for
         llama <- binding
         defaultParams <- defaultParams
