@@ -18,7 +18,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
   lazy val decoder = StandardCharsets.UTF_8.newDecoder
 
-  def generate(prompt: String, params: LlmParams): LazyList[Token] =
+  def generate(prompt: String, params: LlmParams): Usage =
     val lastTokens = new ArrayDeque[Int](ctxSize)
     val stop = Stop.Acc[Token](params.stopSeqs)
 
@@ -72,8 +72,11 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
     val ids = encode(prompt)
     ids.foreach(lastTokens.append)
     val gen = (e: Evaluated) => tokens(State[Token](params.predictTokens, e))
-    if params.echo then promptTokens(ids, Array()) #::: gen(Evaluated.none)
-    else gen(evaluate(ids, Evaluated.none, params.context))
+    Usage(
+      ids.size,
+      if params.echo then promptTokens(ids, Array()) #::: gen(Evaluated.none)
+      else gen(evaluate(ids, Evaluated.none, params.context))
+    )
   end generate
 
   def promptTokens(ids: Array[Int], pending: Array[Byte]): LazyList[Token] =
