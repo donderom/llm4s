@@ -9,9 +9,9 @@ import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.types.SizeT
 import fr.hammons.slinc.{FSet, Ptr, Scope}
 
-private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
-  import State.*
+import State.*
 
+private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
   final case class Sample(id: Int, prob: Option[Probability])
 
   val llama = FSet.instance[Llama]
@@ -146,9 +146,11 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
   def sample(
       repeatTokens: Array[Int],
-      params: SamplingParams,
+      sampling: Sampling,
       logitBias: Map[Int, Float]
   ): Sample =
+    import Sampling.*
+
     Scope.confined:
       val logits = llama.llama_get_logits(ctx).asArray(vocabSize).unsafeArray
       logitBias.foreach((token, bias) => logits(token) = bias)
@@ -173,85 +175,55 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
         candidates = candidates,
         last_tokens = repeatLastTokens,
         last_tokens_size = repeatTokensSize,
-        penalty = params.repeatPenalty
+        penalty = sampling.penalty.repeat
       )
       llama.llama_sample_frequency_and_presence_penalties(
         ctx = ctx,
         candidates = candidates,
         last_tokens = repeatLastTokens,
         last_tokens_size = repeatTokensSize,
-        alpha_frequency = params.frequencyPenalty,
-        alpha_presence = params.presencePenalty
+        alpha_frequency = sampling.penalty.frequency,
+        alpha_presence = sampling.penalty.presence
       )
 
-      val tokenId = if params.temp <= 0 then
-        val id = llama.llama_sample_token_greedy(ctx, candidates)
-        if params.logprobs > 0 then llama.llama_sample_softmax(ctx, candidates)
-        id
-      else
-        params.mirostat.collect:
-          case mirostat @ Mirostat.Params(Mirostat.V1, tau, eta, m) =>
-            llama.llama_sample_temperature(
-              ctx = ctx,
-              candidates = candidates,
-              temp = params.temp
-            )
-            llama.llama_sample_token_mirostat(
-              ctx = ctx,
-              candidates = candidates,
-              tau = tau,
-              eta = eta,
-              m = m,
-              mu = Ptr.copy(mirostat.mu)
-            )
+      val tokenId = sampling match
+        case Greedy(_, _, logprobs) =>
+          val id = llama.llama_sample_token_greedy(ctx, candidates)
+          if logprobs > 0 then llama.llama_sample_softmax(ctx, candidates)
+          id
 
-          case mirostat @ Mirostat.Params(Mirostat.V2, tau, eta, _) =>
-            llama.llama_sample_temperature(
-              ctx = ctx,
-              candidates = candidates,
-              temp = params.temp
-            )
-            llama.llama_sample_token_mirostat_v2(
-              ctx = ctx,
-              candidates = candidates,
-              tau = tau,
-              eta = eta,
-              mu = Ptr.copy(mirostat.mu)
-            )
-        .getOrElse:
-          val topK = params.topK.filter(_ > 0).getOrElse(vocabSize)
-          val minKeep = SizeT(math.max(1, params.logprobs).toShort)
-          llama.llama_sample_top_k(
+        case MirostatV1(_, _, _, temp, tau, eta, m, muCoef) =>
+          llama.llama_sample_temperature(ctx, candidates, temp)
+          llama.llama_sample_token_mirostat(
             ctx = ctx,
             candidates = candidates,
-            k = topK,
-            min_keep = minKeep
+            tau = tau,
+            eta = eta,
+            m = m,
+            mu = Ptr.copy(muCoef * tau)
           )
-          llama.llama_sample_tail_free(
+
+        case MirostatV2(_, _, _, temp, tau, eta, muCoef) =>
+          llama.llama_sample_temperature(ctx, candidates, temp)
+          llama.llama_sample_token_mirostat_v2(
             ctx = ctx,
             candidates = candidates,
-            z = params.tfsZ,
-            min_keep = minKeep
+            tau = tau,
+            eta = eta,
+            mu = Ptr.copy(muCoef * tau)
           )
-          llama.llama_sample_typical(
-            ctx = ctx,
-            candidates = candidates,
-            p = params.typicalP,
-            min_keep = minKeep
-          )
-          llama.llama_sample_top_p(
-            ctx = ctx,
-            candidates = candidates,
-            p = params.topP,
-            min_keep = minKeep
-          )
-          llama.llama_sample_temperature(
-            ctx = ctx,
-            candidates = candidates,
-            temp = params.temp
-          )
-          llama.llama_sample_token(ctx = ctx, candidates = candidates)
-      Sample(tokenId, logprob(tokenId, data, params.logprobs))
+
+        case Random(_, _, logprobs, temp, topK, tfsZ, typicalP, topP) =>
+          val topk = topK.filter(_ > 0).getOrElse(vocabSize)
+          val minKeep = SizeT(math.max(1, logprobs).toShort)
+          llama.llama_sample_top_k(ctx, candidates, topk, minKeep)
+          llama.llama_sample_tail_free(ctx, candidates, tfsZ, minKeep)
+          llama.llama_sample_typical(ctx, candidates, typicalP, minKeep)
+          llama.llama_sample_top_p(ctx, candidates, topP, minKeep)
+          llama.llama_sample_temperature(ctx, candidates, temp)
+          llama.llama_sample_token(ctx, candidates)
+
+      Sample(tokenId, logprob(tokenId, data, sampling.logprobs))
   end sample
 
   def logprob(
