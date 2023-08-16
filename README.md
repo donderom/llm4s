@@ -6,7 +6,7 @@
 
 ### Setup
 
-Add Slinc runtime and llm4s to your `build.sbt`:
+Add `llm4s` to your `build.sbt`:
 
 ```scala
 libraryDependencies += "com.donderom" %% "llm4s" % "0.9.0"
