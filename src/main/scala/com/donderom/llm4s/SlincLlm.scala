@@ -11,7 +11,7 @@ import fr.hammons.slinc.{FSet, Ptr, Scope}
 
 import State.*
 
-private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
+private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   final case class Sample(id: Int, prob: Option[Probability])
 
   val llama = FSet.instance[Llama]
@@ -101,7 +101,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
   def encode(prompt: String): Array[Int] = encode(" " + prompt, true)
 
   def encode(text: String, addBos: Boolean): Array[Int] =
-    val bos = addBos.toByte
+    val bos = if addBos then 1 else 0
     val bytes = text.getBytes(StandardCharsets.UTF_8)
     val res = new Array[Int](bytes.size + bos)
     Scope.confined:
@@ -111,7 +111,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
         text = Ptr.copy(bytes),
         tokens = tokens,
         n_max_tokens = res.size,
-        add_bos = bos
+        add_bos = addBos
       )
       tokens.asArray(math.min(numTokens, ctxSize)).unsafeArray
 
@@ -155,16 +155,16 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
       val logits = llama.llama_get_logits(ctx).asArray(vocabSize).unsafeArray
       logitBias.foreach((token, bias) => logits(token) = bias)
 
-      val tokenData = Array.tabulate[llama_token_data](vocabSize): tokenId =>
-        llama_token_data(id = tokenId, logit = logits(tokenId), p = .0)
+      val tokenData = Array.tabulate[Llama.TokenData](vocabSize): tokenId =>
+        Llama.TokenData(id = tokenId, logit = logits(tokenId), p = .0)
 
       val data = Ptr.copy(tokenData)
 
       val candidates = Ptr.copy(
-        llama_token_data_array(
+        Llama.TokenDataArray(
           data = data,
           size = SizeT(tokenData.size.toShort),
-          sorted = 0
+          sorted = false
         )
       )
 
@@ -228,7 +228,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
 
   def logprob(
       id: Int,
-      data: Ptr[llama_token_data],
+      data: Ptr[Llama.TokenData],
       num: Int
   ): Option[Probability] =
     def tokenValue(tokenId: Int): String =
@@ -238,7 +238,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Ptr[Any]):
           bytes.map(b => s"\\\\x${String.format("%02x", b)}").mkString
 
     if num > 0 then
-      val log = (td: llama_token_data) => math.log(td.p)
+      val log = (td: Llama.TokenData) => math.log(td.p)
       val cap = math.min(num, vocabSize)
       val logprobs = data.asArray(cap).unsafeArray.map: td =>
         Logprob(tokenValue(td.id), log(td))

@@ -7,20 +7,17 @@ import scala.util.Try
 import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.{FSet, Ptr, Scope, Slinc}
 
-extension (bool: Boolean) def toByte: Byte = if bool then 1 else 0
-
 trait LlamaModel:
-  case class Model(repr: Llama.Model, params: llama_context_params)
+  case class Model(repr: Llama.Model, params: Llama.ContextParams)
 
   val embedding: Boolean
 
   private lazy val binding = Try(FSet.instance[Llama])
 
   def createModel(model: Path, params: ContextParams): Try[Model] =
-    binding.foreach(_.llama_backend_init(params.numa.toByte))
+    binding.foreach(_.llama_backend_init(params.numa))
 
-    val defaultParams = binding.map: llama =>
-      llama.llama_context_default_params()
+    val defaultParams = binding.map(_.llama_context_default_params())
 
     Scope.global:
       val baseModel = for
@@ -71,9 +68,9 @@ trait LlamaModel:
       llama.llama_backend_free()
 
   private def llamaParams(
-      defaultParams: llama_context_params,
+      defaultParams: Llama.ContextParams,
       params: ContextParams
-  ): llama_context_params =
+  ): Llama.ContextParams =
     defaultParams.copy(
       seed = params.seed,
       n_ctx = params.contextSize,
@@ -82,11 +79,11 @@ trait LlamaModel:
       main_gpu = params.mainGpu,
       rope_freq_base = params.rope.freqBase,
       rope_freq_scale = params.rope.freqScale,
-      low_vram = params.lowVram.toByte,
-      f16_kv = params.f16.toByte,
-      logits_all = 0,
-      vocab_only = 0,
-      use_mmap = params.mmap.toByte,
-      use_mlock = params.mlock.toByte,
-      embedding = embedding.toByte
+      low_vram = params.lowVram,
+      f16_kv = params.f16,
+      logits_all = false,
+      vocab_only = false,
+      use_mmap = params.mmap,
+      use_mlock = params.mlock,
+      embedding = embedding
     )
