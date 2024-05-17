@@ -48,8 +48,9 @@ object State:
 
   extension (eval: Evaluated)
     def toInt: Int = eval
-    def incr: Evaluated = +1
+    def incr: Evaluated = eval + 1
     def +(num: Int): Evaluated = eval + num
+    def -(num: Int): Evaluated = eval - num
 
   def apply[Tok: Stringy](
       predictTokens: Int,

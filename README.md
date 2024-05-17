@@ -9,7 +9,7 @@
 Add `llm4s` to your `build.sbt`:
 
 ```scala
-libraryDependencies += "com.donderom" %% "llm4s" % "0.10.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.11.0"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -23,13 +23,14 @@ Version compatibility:
 
 | llm4s | Scala |    JDK | llama.cpp (commit hash) |
 |------:|------:|-------:|------------------------:|
-| 0.10+ | 3.3.0 | 17, 19 |        49e7cb5 (Jul 31) |
+| 0.11+ | 3.3.0 | 17, 19 |         229ffff (May 8) |
 
 <details>
   <summary>Older versions</summary>
 
   | llm4s |     Scala |    JDK | llama.cpp (commit hash) |
   |------:|----------:|-------:|------------------------:|
+  | 0.10+ |     3.3.0 | 17, 19 |        49e7cb5 (Jul 31) |
   |  0.6+ |       --- |    --- |        49e7cb5 (Jul 31) |
   |  0.4+ |       --- |    --- |        70d26ac (Jul 23) |
   |  0.3+ |       --- |    --- |        a6803ca (Jul 14) |
@@ -43,25 +44,26 @@ Version compatibility:
 import java.nio.file.Paths
 import com.donderom.llm4s.*
 
-System.load("path/to/libllama.so")
-val model = Paths.get("path/to/ggml-model.bin")
-val contextParams = ContextParams(threads = 6)
-val prompt = "Deep learning is "
+// Path to the llama.cpp shared library
+System.load("llama.cpp/libllama.so")
+
+// Path to the model supported by llama.cpp
+val model = Paths.get("models/llama-7b-v2/llama-2-7b.Q4_K_M.gguf")
+val prompt = "Large Language Model is"
 ```
 
 #### Completion
 
 ```scala
-val llm = Llm(model = model, params = contextParams)
-val params = LlmParams(context = contextParams, predictTokens = 256)
+val llm = Llm(model)
 
 // To print generation as it goes
-llm(prompt, params).foreach: stream =>
+llm(prompt).foreach: stream =>
   stream.foreach: token =>
     print(token)
 
 // Or build a string
-llm(prompt, params).foreach(stream => println(stream.mkString))
+llm(prompt).foreach(stream => println(stream.mkString))
 
 llm.close()
 ```
@@ -69,10 +71,10 @@ llm.close()
 #### Embeddings
 
 ```scala
-val embedding = Embedding(model = model, params = contextParams)
-embedding(prompt, contextParams).foreach: embeddings =>
+val llm = Llm(model)
+llm.embeddings(prompt).foreach: embeddings =>
   embeddings.foreach: embd =>
     print(embd)
     print(' ')
-embedding.close()
+llm.close()
 ```
