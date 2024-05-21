@@ -248,7 +248,18 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
             mu = Ptr.copy(muCoef * tau)
           )
 
-        case Random(_, _, logprobs, temp, topK, tfsZ, typicalP, topP, minP) =>
+        case Random(
+              _,
+              _,
+              logprobs,
+              temp,
+              topK,
+              tfsZ,
+              typicalP,
+              topP,
+              minP,
+              dynatemp
+            ) =>
           val topk = topK.filter(_ > 0).getOrElse(vocabSize)
           val minKeep = SizeT(math.max(1, logprobs).toShort)
           llama.llama_sample_top_k(ctx, candidates, topk, minKeep)
@@ -256,7 +267,17 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
           llama.llama_sample_typical(ctx, candidates, typicalP, minKeep)
           llama.llama_sample_top_p(ctx, candidates, topP, minKeep)
           llama.llama_sample_min_p(ctx, candidates, minP, minKeep)
-          llama.llama_sample_temp(ctx, candidates, temp)
+          if dynatemp.range > 0 then
+            val dynatemp_min = math.max(.0f, temp - dynatemp.range)
+            val dynatemp_max = math.max(.0f, temp + dynatemp.range)
+            llama.llama_sample_entropy(
+              ctx = ctx,
+              candidates_p = candidates,
+              min_temp = dynatemp_min,
+              max_temp = dynatemp_max,
+              exponent_val = dynatemp.exponent
+            )
+          else llama.llama_sample_temp(ctx, candidates, temp)
           llama.llama_sample_token(ctx, candidates)
 
       Sample(tokenId, logprob(tokenId, data, sampling.logprobs))

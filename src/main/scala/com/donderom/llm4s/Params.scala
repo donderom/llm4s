@@ -64,6 +64,11 @@ final case class Penalty(
     presence: Float = .0f
 )
 
+final case class Dynatemp(
+    range: Float = .0f,
+    exponent: Float = 1.0f
+)
+
 enum Sampling(
     val penalty: Penalty,
     val repeatLastTokens: Int,
@@ -105,7 +110,8 @@ enum Sampling(
       tfsZ: Float = 1.0f,
       typicalP: Float = 1.0f,
       topP: Float = .95f,
-      minP: Float = .05f
+      minP: Float = .05f,
+      dynatemp: Dynatemp = Dynatemp()
   ) extends Sampling(penalty, repeatLastTokens, logprobs)
 
 final case class LlmParams(
