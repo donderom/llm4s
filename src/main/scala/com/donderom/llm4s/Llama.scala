@@ -12,90 +12,86 @@ object Llama:
   type Grammar = Ptr[Any]
 
   enum VocabType:
-    case LLAMA_VOCAB_TYPE_NONE, LLAMA_VOCAB_TYPE_SPM, LLAMA_VOCAB_TYPE_BPE,
-      LLAMA_VOCAB_TYPE_WPM
+    case NONE, SPM, BPE, WPM
 
   given Transform[VocabType, CInt](VocabType.fromOrdinal, _.ordinal)
 
   enum TokenType:
-    case LLAMA_TOKEN_TYPE_UNDEFINED, LLAMA_TOKEN_TYPE_NORMAL,
-      LLAMA_TOKEN_TYPE_UNKNOWN, LLAMA_TOKEN_TYPE_CONTROL,
-      LLAMA_TOKEN_TYPE_USER_DEFINED, LLAMA_TOKEN_TYPE_UNUSED,
-      LLAMA_TOKEN_TYPE_BYTE
+    case UNDEFINED, NORMAL, UNKNOWN, CONTROL, USER_DEFINED, UNUSED, BYTE
 
   given Transform[TokenType, CInt](TokenType.fromOrdinal, _.ordinal)
 
   enum Ftype(val code: CInt):
-    case LLAMA_FTYPE_ALL_F32 extends Ftype(0)
-    case LLAMA_FTYPE_MOSTLY_F16 extends Ftype(1)
-    case LLAMA_FTYPE_MOSTLY_Q4_0 extends Ftype(2)
-    case LLAMA_FTYPE_MOSTLY_Q4_1 extends Ftype(3)
-    case LLAMA_FTYPE_MOSTLY_Q4_1_SOME_F16 extends Ftype(4)
-    case LLAMA_FTYPE_MOSTLY_Q8_0 extends Ftype(7)
-    case LLAMA_FTYPE_MOSTLY_Q5_0 extends Ftype(8)
-    case LLAMA_FTYPE_MOSTLY_Q5_1 extends Ftype(9)
-    case LLAMA_FTYPE_MOSTLY_Q2_K extends Ftype(10)
-    case LLAMA_FTYPE_MOSTLY_Q3_K_S extends Ftype(11)
-    case LLAMA_FTYPE_MOSTLY_Q3_K_M extends Ftype(12)
-    case LLAMA_FTYPE_MOSTLY_Q3_K_L extends Ftype(13)
-    case LLAMA_FTYPE_MOSTLY_Q4_K_S extends Ftype(14)
-    case LLAMA_FTYPE_MOSTLY_Q4_K_M extends Ftype(15)
-    case LLAMA_FTYPE_MOSTLY_Q5_K_S extends Ftype(16)
-    case LLAMA_FTYPE_MOSTLY_Q5_K_M extends Ftype(17)
-    case LLAMA_FTYPE_MOSTLY_Q6_K extends Ftype(18)
-    case LLAMA_FTYPE_MOSTLY_IQ2_XXS extends Ftype(19)
-    case LLAMA_FTYPE_MOSTLY_IQ2_XS extends Ftype(20)
-    case LLAMA_FTYPE_MOSTLY_Q2_K_S extends Ftype(21)
-    case LLAMA_FTYPE_MOSTLY_IQ3_XS extends Ftype(22)
-    case LLAMA_FTYPE_MOSTLY_IQ3_XXS extends Ftype(23)
-    case LLAMA_FTYPE_MOSTLY_IQ1_S extends Ftype(24)
-    case LLAMA_FTYPE_MOSTLY_IQ4_NL extends Ftype(25)
-    case LLAMA_FTYPE_MOSTLY_IQ3_S extends Ftype(26)
-    case LLAMA_FTYPE_MOSTLY_IQ3_M extends Ftype(27)
-    case LLAMA_FTYPE_MOSTLY_IQ2_S extends Ftype(28)
-    case LLAMA_FTYPE_MOSTLY_IQ2_M extends Ftype(29)
-    case LLAMA_FTYPE_MOSTLY_IQ4_XS extends Ftype(30)
-    case LLAMA_FTYPE_MOSTLY_IQ1_M extends Ftype(31)
-    case LLAMA_FTYPE_MOSTLY_BF16 extends Ftype(32)
-    case LLAMA_FTYPE_GUESSED extends Ftype(1024)
+    case ALL_F32 extends Ftype(0)
+    case MOSTLY_F16 extends Ftype(1)
+    case MOSTLY_Q4_0 extends Ftype(2)
+    case MOSTLY_Q4_1 extends Ftype(3)
+    case MOSTLY_Q4_1_SOME_F16 extends Ftype(4)
+    case MOSTLY_Q8_0 extends Ftype(7)
+    case MOSTLY_Q5_0 extends Ftype(8)
+    case MOSTLY_Q5_1 extends Ftype(9)
+    case MOSTLY_Q2_K extends Ftype(10)
+    case MOSTLY_Q3_K_S extends Ftype(11)
+    case MOSTLY_Q3_K_M extends Ftype(12)
+    case MOSTLY_Q3_K_L extends Ftype(13)
+    case MOSTLY_Q4_K_S extends Ftype(14)
+    case MOSTLY_Q4_K_M extends Ftype(15)
+    case MOSTLY_Q5_K_S extends Ftype(16)
+    case MOSTLY_Q5_K_M extends Ftype(17)
+    case MOSTLY_Q6_K extends Ftype(18)
+    case MOSTLY_IQ2_XXS extends Ftype(19)
+    case MOSTLY_IQ2_XS extends Ftype(20)
+    case MOSTLY_Q2_K_S extends Ftype(21)
+    case MOSTLY_IQ3_XS extends Ftype(22)
+    case MOSTLY_IQ3_XXS extends Ftype(23)
+    case MOSTLY_IQ1_S extends Ftype(24)
+    case MOSTLY_IQ4_NL extends Ftype(25)
+    case MOSTLY_IQ3_S extends Ftype(26)
+    case MOSTLY_IQ3_M extends Ftype(27)
+    case MOSTLY_IQ2_S extends Ftype(28)
+    case MOSTLY_IQ2_M extends Ftype(29)
+    case MOSTLY_IQ4_XS extends Ftype(30)
+    case MOSTLY_IQ1_M extends Ftype(31)
+    case MOSTLY_BF16 extends Ftype(32)
+    case GUESSED extends Ftype(1024)
 
   given Transform[Ftype, CInt](Ftype.fromOrdinal, _.code)
 
   enum RopeScalingType(val code: CInt):
-    case LLAMA_ROPE_SCALING_UNSPECIFIED extends RopeScalingType(-1)
-    case LLAMA_ROPE_SCALING_NONE extends RopeScalingType(0)
-    case LLAMA_ROPE_SCALING_LINEAR extends RopeScalingType(1)
-    case LLAMA_ROPE_SCALING_YARN extends RopeScalingType(2)
-    case LLAMA_ROPE_SCALING_MAX_VALUE extends RopeScalingType(2)
+    case UNSPECIFIED extends RopeScalingType(-1)
+    case NONE extends RopeScalingType(0)
+    case LINEAR extends RopeScalingType(1)
+    case YARN extends RopeScalingType(2)
+    case MAX_VALUE extends RopeScalingType(2)
 
   given Transform[RopeScalingType, CInt](
     _ match
-      case 0 => RopeScalingType.LLAMA_ROPE_SCALING_NONE
-      case 1 => RopeScalingType.LLAMA_ROPE_SCALING_LINEAR
-      case 2 => RopeScalingType.LLAMA_ROPE_SCALING_YARN
-      case _ => RopeScalingType.LLAMA_ROPE_SCALING_UNSPECIFIED
+      case 0 => RopeScalingType.NONE
+      case 1 => RopeScalingType.LINEAR
+      case 2 => RopeScalingType.YARN
+      case _ => RopeScalingType.UNSPECIFIED
     ,
     _.code
   )
 
   enum PoolingType(val code: CInt):
-    case LLAMA_POOLING_TYPE_UNSPECIFIED extends PoolingType(-1)
-    case LLAMA_POOLING_TYPE_NONE extends PoolingType(0)
-    case LLAMA_POOLING_TYPE_MEAN extends PoolingType(1)
-    case LLAMA_POOLING_TYPE_CLS extends PoolingType(2)
+    case UNSPECIFIED extends PoolingType(-1)
+    case NONE extends PoolingType(0)
+    case MEAN extends PoolingType(1)
+    case CLS extends PoolingType(2)
 
   given Transform[PoolingType, CInt](
     _ match
-      case 0 => PoolingType.LLAMA_POOLING_TYPE_NONE
-      case 1 => PoolingType.LLAMA_POOLING_TYPE_MEAN
-      case 2 => PoolingType.LLAMA_POOLING_TYPE_CLS
-      case _ => PoolingType.LLAMA_POOLING_TYPE_UNSPECIFIED
+      case 0 => PoolingType.NONE
+      case 1 => PoolingType.MEAN
+      case 2 => PoolingType.CLS
+      case _ => PoolingType.UNSPECIFIED
     ,
     _.code
   )
 
   enum SplitMode:
-    case LLAMA_SPLIT_MODE_NONE, LLAMA_SPLIT_MODE_LAYER, LLAMA_SPLIT_MODE_ROW
+    case NONE, LAYER, ROW
 
   given Transform[SplitMode, CInt](SplitMode.fromOrdinal, _.ordinal)
 
@@ -121,7 +117,7 @@ object Llama:
   ) derives Struct
 
   enum ModelKvOverrideType:
-    case LLAMA_KV_OVERRIDE_INT, LLAMA_KV_OVERRIDE_FLOAT, LLAMA_KV_OVERRIDE_BOOL
+    case INT, FLOAT, BOOL
 
   given Transform[ModelKvOverrideType, CInt](
     ModelKvOverrideType.fromOrdinal,
@@ -149,46 +145,46 @@ object Llama:
   ) derives Struct
 
   enum GgmlType(val code: CInt):
-    case GGML_TYPE_F32 extends GgmlType(0)
-    case GGML_TYPE_F16 extends GgmlType(1)
-    case GGML_TYPE_Q4_0 extends GgmlType(2)
-    case GGML_TYPE_Q4_1 extends GgmlType(3)
-    case GGML_TYPE_Q5_0 extends GgmlType(6)
-    case GGML_TYPE_Q5_1 extends GgmlType(7)
-    case GGML_TYPE_Q8_0 extends GgmlType(8)
-    case GGML_TYPE_Q8_1 extends GgmlType(9)
+    case F32 extends GgmlType(0)
+    case F16 extends GgmlType(1)
+    case Q4_0 extends GgmlType(2)
+    case Q4_1 extends GgmlType(3)
+    case Q5_0 extends GgmlType(6)
+    case Q5_1 extends GgmlType(7)
+    case Q8_0 extends GgmlType(8)
+    case Q8_1 extends GgmlType(9)
     // k-quantizations
-    case GGML_TYPE_Q2_K extends GgmlType(10)
-    case GGML_TYPE_Q3_K extends GgmlType(11)
-    case GGML_TYPE_Q4_K extends GgmlType(12)
-    case GGML_TYPE_Q5_K extends GgmlType(13)
-    case GGML_TYPE_Q6_K extends GgmlType(14)
-    case GGML_TYPE_Q8_K extends GgmlType(15)
-    case GGML_TYPE_I8 extends GgmlType(16)
-    case GGML_TYPE_I16 extends GgmlType(17)
-    case GGML_TYPE_I32 extends GgmlType(18)
-    case GGML_TYPE_COUNT extends GgmlType(19)
+    case Q2_K extends GgmlType(10)
+    case Q3_K extends GgmlType(11)
+    case Q4_K extends GgmlType(12)
+    case Q5_K extends GgmlType(13)
+    case Q6_K extends GgmlType(14)
+    case Q8_K extends GgmlType(15)
+    case I8 extends GgmlType(16)
+    case I16 extends GgmlType(17)
+    case I32 extends GgmlType(18)
+    case COUNT extends GgmlType(19)
 
   given Transform[GgmlType, CInt](
     _ match
-      case 0  => GgmlType.GGML_TYPE_F32
-      case 1  => GgmlType.GGML_TYPE_F16
-      case 2  => GgmlType.GGML_TYPE_Q4_0
-      case 3  => GgmlType.GGML_TYPE_Q4_1
-      case 6  => GgmlType.GGML_TYPE_Q5_0
-      case 7  => GgmlType.GGML_TYPE_Q5_1
-      case 8  => GgmlType.GGML_TYPE_Q8_0
-      case 9  => GgmlType.GGML_TYPE_Q8_1
-      case 10 => GgmlType.GGML_TYPE_Q2_K
-      case 11 => GgmlType.GGML_TYPE_Q3_K
-      case 12 => GgmlType.GGML_TYPE_Q4_K
-      case 13 => GgmlType.GGML_TYPE_Q5_K
-      case 14 => GgmlType.GGML_TYPE_Q6_K
-      case 15 => GgmlType.GGML_TYPE_Q8_K
-      case 16 => GgmlType.GGML_TYPE_I8
-      case 17 => GgmlType.GGML_TYPE_I16
-      case 18 => GgmlType.GGML_TYPE_I32
-      case 19 => GgmlType.GGML_TYPE_COUNT
+      case 0  => GgmlType.F32
+      case 1  => GgmlType.F16
+      case 2  => GgmlType.Q4_0
+      case 3  => GgmlType.Q4_1
+      case 6  => GgmlType.Q5_0
+      case 7  => GgmlType.Q5_1
+      case 8  => GgmlType.Q8_0
+      case 9  => GgmlType.Q8_1
+      case 10 => GgmlType.Q2_K
+      case 11 => GgmlType.Q3_K
+      case 12 => GgmlType.Q4_K
+      case 13 => GgmlType.Q5_K
+      case 14 => GgmlType.Q6_K
+      case 15 => GgmlType.Q8_K
+      case 16 => GgmlType.I8
+      case 17 => GgmlType.I16
+      case 18 => GgmlType.I32
+      case 19 => GgmlType.COUNT
     ,
     _.code
   )
@@ -243,13 +239,7 @@ object Llama:
   given Transform[NumaStrategy, CInt](NumaStrategy.fromOrdinal, _.ordinal)
 
   enum Gretype:
-    case LLAMA_GRETYPE_END,
-      LLAMA_GRETYPE_ALT,
-      LLAMA_GRETYPE_RULE_REF,
-      LLAMA_GRETYPE_CHAR,
-      LLAMA_GRETYPE_CHAR_NOT,
-      LLAMA_GRETYPE_CHAR_RNG_UPPER,
-      LLAMA_GRETYPE_CHAR_ALT
+    case END, ALT, RULE_REF, CHAR, CHAR_NOT, CHAR_RNG_UPPER, CHAR_ALT
 
   given Transform[Gretype, CInt](Gretype.fromOrdinal, _.ordinal)
 

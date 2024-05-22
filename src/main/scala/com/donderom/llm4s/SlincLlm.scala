@@ -115,7 +115,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val addBosToken: Int = llama.llama_add_bos_token(model)
   lazy val addBos: Boolean =
     if addBosToken != -1 then addBosToken != 0
-    else llama.llama_vocab_type(model) == Llama.VocabType.LLAMA_VOCAB_TYPE_SPM
+    else llama.llama_vocab_type(model) == Llama.VocabType.SPM
 
   def keepGenerating(token: Int): Boolean =
     !llama.llama_token_is_eog(model, token)

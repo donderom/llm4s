@@ -33,8 +33,7 @@ final case class ModelParams(
 )
 
 final case class RopeParams(
-    scalingType: RopeScalingType = RopeScalingType
-      .LLAMA_ROPE_SCALING_UNSPECIFIED,
+    scalingType: RopeScalingType = RopeScalingType.UNSPECIFIED,
     freqBase: Float = 0.0f,
     freqScale: Float = 0.0f
 )
