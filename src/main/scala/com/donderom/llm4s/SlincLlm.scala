@@ -258,26 +258,34 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
               typicalP,
               topP,
               minP,
-              dynatemp
+              dynatemp,
+              samplers
             ) =>
           val topk = topK.filter(_ > 0).getOrElse(vocabSize)
           val minKeep = SizeT(math.max(1, logprobs).toShort)
-          llama.llama_sample_top_k(ctx, candidates, topk, minKeep)
-          llama.llama_sample_tail_free(ctx, candidates, tfsZ, minKeep)
-          llama.llama_sample_typical(ctx, candidates, typicalP, minKeep)
-          llama.llama_sample_top_p(ctx, candidates, topP, minKeep)
-          llama.llama_sample_min_p(ctx, candidates, minP, minKeep)
-          if dynatemp.range > 0 then
-            val dynatemp_min = math.max(.0f, temp - dynatemp.range)
-            val dynatemp_max = math.max(.0f, temp + dynatemp.range)
-            llama.llama_sample_entropy(
-              ctx = ctx,
-              candidates_p = candidates,
-              min_temp = dynatemp_min,
-              max_temp = dynatemp_max,
-              exponent_val = dynatemp.exponent
-            )
-          else llama.llama_sample_temp(ctx, candidates, temp)
+          samplers.foreach:
+            case Sampler.TOP_K =>
+              llama.llama_sample_top_k(ctx, candidates, topk, minKeep)
+            case Sampler.TAIL_FREE =>
+              llama.llama_sample_tail_free(ctx, candidates, tfsZ, minKeep)
+            case Sampler.TYPICAL =>
+              llama.llama_sample_typical(ctx, candidates, typicalP, minKeep)
+            case Sampler.TOP_P =>
+              llama.llama_sample_top_p(ctx, candidates, topP, minKeep)
+            case Sampler.MIN_P =>
+              llama.llama_sample_min_p(ctx, candidates, minP, minKeep)
+            case Sampler.TEMPERATURE =>
+              if dynatemp.range > 0 then
+                val dynatemp_min = math.max(.0f, temp - dynatemp.range)
+                val dynatemp_max = math.max(.0f, temp + dynatemp.range)
+                llama.llama_sample_entropy(
+                  ctx = ctx,
+                  candidates_p = candidates,
+                  min_temp = dynatemp_min,
+                  max_temp = dynatemp_max,
+                  exponent_val = dynatemp.exponent
+                )
+              else llama.llama_sample_temp(ctx, candidates, temp)
           llama.llama_sample_token(ctx, candidates)
 
       Sample(tokenId, logprob(tokenId, data, sampling.logprobs))

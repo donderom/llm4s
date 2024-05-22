@@ -69,6 +69,9 @@ final case class Dynatemp(
     exponent: Float = 1.0f
 )
 
+enum Sampler:
+  case TOP_K, TAIL_FREE, TYPICAL, TOP_P, MIN_P, TEMPERATURE
+
 enum Sampling(
     val penalty: Penalty,
     val repeatLastTokens: Int,
@@ -111,7 +114,8 @@ enum Sampling(
       typicalP: Float = 1.0f,
       topP: Float = .95f,
       minP: Float = .05f,
-      dynatemp: Dynatemp = Dynatemp()
+      dynatemp: Dynatemp = Dynatemp(),
+      samplers: List[Sampler] = Sampler.values.toList
   ) extends Sampling(penalty, repeatLastTokens, logprobs)
 
 final case class LlmParams(
