@@ -2,7 +2,7 @@ package com.donderom.llm4s
 
 import java.nio.file.Path
 
-import Llama.RopeScalingType
+import Llama.{NumaStrategy, RopeScalingType}
 
 object Default:
   val threads = Runtime.getRuntime.availableProcessors
@@ -28,7 +28,7 @@ final case class ModelParams(
     mainGpu: Int = 0,
     mmap: Boolean = true,
     mlock: Boolean = false,
-    numa: Boolean = false,
+    numa: NumaStrategy = NumaStrategy.DISABLED,
     lora: LoraParams = LoraParams()
 )
 

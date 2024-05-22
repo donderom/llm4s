@@ -53,7 +53,9 @@ object Llm:
           model: Path,
           params: ModelParams
       ): Try[Llama.Model] =
-        binding.foreach(_.llama_backend_init())
+        binding.foreach: llama =>
+          llama.llama_backend_init()
+          llama.llama_numa_init(params.numa)
 
         Scope.global:
           val baseModel = binding.map: llama =>

@@ -237,6 +237,11 @@ object Llama:
       kv_overrides: Ptr[Any]
   ) derives Struct
 
+  enum NumaStrategy:
+    case DISABLED, DISTRIBUTE, ISOLATE, NUMACTL, MIRROR, COUNT
+
+  given Transform[NumaStrategy, CInt](NumaStrategy.fromOrdinal, _.ordinal)
+
   enum Gretype:
     case LLAMA_GRETYPE_END,
       LLAMA_GRETYPE_ALT,
@@ -298,6 +303,8 @@ trait Llama derives FSet:
   def llama_model_quantize_default_params(): ModelQuantizeParams
 
   def llama_backend_init(): Unit
+
+  def llama_numa_init(strategy: NumaStrategy): Unit
 
   def llama_backend_free(): Unit
 
