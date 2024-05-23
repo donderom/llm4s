@@ -153,17 +153,28 @@ object Llama:
     case Q5_1 extends GgmlType(7)
     case Q8_0 extends GgmlType(8)
     case Q8_1 extends GgmlType(9)
-    // k-quantizations
     case Q2_K extends GgmlType(10)
     case Q3_K extends GgmlType(11)
     case Q4_K extends GgmlType(12)
     case Q5_K extends GgmlType(13)
     case Q6_K extends GgmlType(14)
     case Q8_K extends GgmlType(15)
-    case I8 extends GgmlType(16)
-    case I16 extends GgmlType(17)
-    case I32 extends GgmlType(18)
-    case COUNT extends GgmlType(19)
+    case IQ2_XXS extends GgmlType(16)
+    case IQ2_XS extends GgmlType(17)
+    case IQ3_XXS extends GgmlType(18)
+    case IQ1_S extends GgmlType(19)
+    case IQ4_NL extends GgmlType(20)
+    case IQ3_S extends GgmlType(21)
+    case IQ2_S extends GgmlType(22)
+    case IQ4_XS extends GgmlType(23)
+    case I8 extends GgmlType(24)
+    case I16 extends GgmlType(25)
+    case I32 extends GgmlType(26)
+    case I64 extends GgmlType(27)
+    case F64 extends GgmlType(28)
+    case IQ1_M extends GgmlType(29)
+    case BF16 extends GgmlType(30)
+    case COUNT extends GgmlType(31)
 
   given Transform[GgmlType, CInt](
     _ match
@@ -181,10 +192,22 @@ object Llama:
       case 13 => GgmlType.Q5_K
       case 14 => GgmlType.Q6_K
       case 15 => GgmlType.Q8_K
-      case 16 => GgmlType.I8
-      case 17 => GgmlType.I16
-      case 18 => GgmlType.I32
-      case 19 => GgmlType.COUNT
+      case 16 => GgmlType.IQ2_XXS
+      case 17 => GgmlType.IQ2_XS
+      case 18 => GgmlType.IQ3_XXS
+      case 19 => GgmlType.IQ1_S
+      case 20 => GgmlType.IQ4_NL
+      case 21 => GgmlType.IQ3_S
+      case 22 => GgmlType.IQ2_S
+      case 23 => GgmlType.IQ4_XS
+      case 24 => GgmlType.I8
+      case 25 => GgmlType.I16
+      case 26 => GgmlType.I32
+      case 27 => GgmlType.I64
+      case 28 => GgmlType.F64
+      case 29 => GgmlType.IQ1_M
+      case 30 => GgmlType.BF16
+      case 31 => GgmlType.COUNT
     ,
     _.code
   )
@@ -212,7 +235,7 @@ object Llama:
       type_k: GgmlType,
       type_v: GgmlType,
       logits_all: CBool,
-      embedding: CBool,
+      embeddings: CBool,
       offload_kqv: CBool,
       flash_attn: CBool,
       abort_callback: Ptr[Any],
