@@ -117,7 +117,7 @@ object Llama:
   ) derives Struct
 
   enum ModelKvOverrideType:
-    case INT, FLOAT, BOOL
+    case INT, FLOAT, BOOL, STR
 
   given Transform[ModelKvOverrideType, CInt](
     ModelKvOverrideType.fromOrdinal,
