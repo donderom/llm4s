@@ -116,6 +116,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val addBos: Boolean =
     if addBosToken != -1 then addBosToken != 0
     else llama.llama_vocab_type(model) == Llama.VocabType.SPM
+  lazy val newLineToken: Int = llama.llama_token_nl(model)
 
   def keepGenerating(token: Int): Boolean =
     !llama.llama_token_is_eog(model, token)
@@ -219,6 +220,12 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
         penalty_freq = sampling.penalty.frequency,
         penalty_present = sampling.penalty.presence
       )
+
+      if !sampling.penalty.penalizeNewLines then
+        val newLineLogit = logits(newLineToken)
+        val newLineIndex = tokenData.indexWhere(_.id == newLineToken)
+        if newLineIndex != -1 then
+          !data(newLineIndex) = (!data(newLineIndex)).copy(logit = newLineLogit)
 
       val tokenId = sampling match
         case Greedy(_, _, logprobs) =>

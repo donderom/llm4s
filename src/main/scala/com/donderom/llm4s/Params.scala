@@ -60,7 +60,8 @@ final case class ContextParams(
 final case class Penalty(
     repeat: Float = 1.10f,
     frequency: Float = .0f,
-    presence: Float = .0f
+    presence: Float = .0f,
+    penalizeNewLines: Boolean = true
 )
 
 final case class Dynatemp(
