@@ -24,30 +24,68 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     val stop = Stop.Acc[Token](params.stopSeqs)
 
     def eval(evaluated: Evaluated): Evaluated =
-      val past = if evaluated.incr.toInt > ctxSize then
-        val keepTokens = params.keepTokens + (if addBos then 1 else 0)
-        val left = evaluated.toInt - keepTokens
-        val discard = left / 2
-        llama.llama_kv_cache_seq_rm(
-          ctx = ctx,
-          seq_id = 0,
-          p0 = keepTokens,
-          p1 = keepTokens + discard
-        )
-        llama.llama_kv_cache_seq_add(
-          ctx = ctx,
-          seq_id = 0,
-          p0 = keepTokens + discard,
-          p1 = evaluated.toInt,
-          delta = -discard
-        )
-        evaluated - discard
-      else evaluated
+      val past =
+        if evaluated.incr.toInt > ctxSize then
+          if params.groupAttention.factor == 1 then
+            val keepTokens = params.keepTokens + (if addBos then 1 else 0)
+            val left = evaluated.toInt - keepTokens
+            val discard = left / 2
+            llama.llama_kv_cache_seq_rm(
+              ctx = ctx,
+              seq_id = 0,
+              p0 = keepTokens,
+              p1 = keepTokens + discard
+            )
+            llama.llama_kv_cache_seq_add(
+              ctx = ctx,
+              seq_id = 0,
+              p0 = keepTokens + discard,
+              p1 = evaluated.toInt,
+              delta = -discard
+            )
+            evaluated - discard
+          else
+            val factor = params.groupAttention.factor
+            val width = params.groupAttention.width
+
+            @annotation.tailrec
+            def selfExtend(past: Evaluated, kvTokens: Int): Evaluated =
+              if past.toInt >= kvTokens + width then
+                val ib = (factor * kvTokens) / width
+                val bd = (width / factor) * (factor - 1)
+                val dd = (width / factor) - ib * bd - width
+                llama.llama_kv_cache_seq_add(
+                  ctx = ctx,
+                  seq_id = 0,
+                  p0 = kvTokens,
+                  p1 = past.toInt,
+                  delta = ib * bd
+                )
+                llama.llama_kv_cache_seq_div(
+                  ctx = ctx,
+                  seq_id = 0,
+                  p0 = kvTokens + ib * bd,
+                  p1 = kvTokens + ib * bd + width,
+                  d = factor
+                )
+                llama.llama_kv_cache_seq_add(
+                  ctx = ctx,
+                  seq_id = 0,
+                  p0 = kvTokens + ib * bd + width,
+                  p1 = past.toInt + ib * bd,
+                  delta = dd
+                )
+                selfExtend(past - bd, width / factor)
+              else past
+
+            selfExtend(evaluated, 0)
+        else evaluated
 
       val start =
         if lastTokens.size == ctxSize then ctxSize - 1 else evaluated.toInt
       val ids = lastTokens.slice(start, lastTokens.size).toArray
       evaluate(ids, past, params.context.batch)
+    end eval
 
     def repeatTokens(): Array[Int] =
       val repeatLastTokens =

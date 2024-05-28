@@ -48,6 +48,8 @@ final case class YarnParams(
 
 final case class BatchParams(size: Int = 512, threads: Int = Default.threads)
 
+final case class GroupAttention(factor: Int = 1, width: Int = 512)
+
 final case class ContextParams(
     seed: Int = -1,
     size: Int = 512,
@@ -126,5 +128,6 @@ final case class LlmParams(
     logitBias: Map[Int, Float] = Map(),
     suffix: Option[String] = None,
     echo: Boolean = true,
-    stopSeqs: List[String] = Nil
+    stopSeqs: List[String] = Nil,
+    groupAttention: GroupAttention = GroupAttention()
 )
