@@ -12,6 +12,7 @@ import fr.hammons.slinc.{FSet, Ptr, Scope}
 import State.*
 
 private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
+  // Logprobs are None until a better solution is implemented
   final case class Sample(id: Int, prob: Option[Probability])
 
   lazy val llama = FSet.instance[Llama]
@@ -20,6 +21,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val decoder = StandardCharsets.UTF_8.newDecoder
 
   def generate(prompt: String, params: LlmParams): Usage =
+    val sampler = createSampler(params.sampling)
     val lastTokens = new ArrayDeque[Int](ctxSize)
     val stop = Stop.Acc[Token](params.stopSeqs)
 
@@ -87,18 +89,13 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
       evaluate(ids, past, params.context.batch)
     end eval
 
-    def repeatTokens(): Array[Int] =
-      val repeatLastTokens =
-        if params.sampling.repeatLastTokens < 0 then ctxSize
-        else params.sampling.repeatLastTokens
-      val lastRepeat = math.min(lastTokens.size, repeatLastTokens)
-      val padding = Array.fill(repeatLastTokens - lastRepeat)(0)
-      padding ++ lastTokens.takeRight(lastRepeat).toArray
-
     def tokens(state: State[Token]): LazyList[Token] =
       if !state.remaining.none then
         val newPast = eval(state.evaluated)
-        val smpl = sample(repeatTokens(), params.sampling, params.logitBias)
+
+        val tokenId = llama.llama_sampler_sample(sampler, ctx, -1)
+        llama.llama_sampler_accept(sampler, tokenId)
+        val smpl = Sample(tokenId, None)
 
         if lastTokens.size == ctxSize then lastTokens.remove(0)
         lastTokens.append(smpl.id)
@@ -119,8 +116,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                   LazyList.from(chunk) #::: gen(st)
                 case stop.Action.Stop(chunk) =>
                   LazyList.from(params.suffix.fold(chunk)(chunk :+ _.token))
-        else close(state.stop.deferred(params.suffix))
-      else close(state.stop.deferred(params.suffix))
+        else close(state.stop.deferred(params.suffix), sampler)
+      else close(state.stop.deferred(params.suffix), sampler)
     end tokens
 
     val ids = encode(prompt)
@@ -143,21 +140,18 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   def embeddings(prompt: String, params: BatchParams): Array[Float] =
     val ids = encode(prompt)
     val _ = evaluate(ids, Evaluated.none, params)
-    val size = llama.llama_n_embd(model)
+    val size = llama.llama_model_n_embd(model)
     val embeddings = llama.llama_get_embeddings(ctx).asArray(size).unsafeArray
     llama.llama_free(ctx)
     embeddings
 
   lazy val ctxSize: Int = llama.llama_n_ctx(ctx)
-  lazy val vocabSize: Int = llama.llama_n_vocab(model)
-  lazy val addBosToken: Int = llama.llama_add_bos_token(model)
-  lazy val addBos: Boolean =
-    if addBosToken != -1 then addBosToken != 0
-    else llama.llama_vocab_type(model) == Llama.VocabType.SPM
-  lazy val newLineToken: Int = llama.llama_token_nl(model)
+  lazy val vocab: Llama.Vocab = llama.llama_model_get_vocab(model)
+  lazy val vocabSize: Int = llama.llama_vocab_n_tokens(vocab)
+  lazy val addBos: Boolean = llama.llama_vocab_get_add_bos(vocab)
 
   def keepGenerating(token: Int): Boolean =
-    !llama.llama_token_is_eog(model, token)
+    !llama.llama_vocab_is_eog(vocab, token)
 
   def encode(text: String): Array[Int] =
     val bos = if addBos then 1 else 0
@@ -166,7 +160,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     Scope.confined:
       val tokens = Ptr.copy(res)
       val numTokens = llama.llama_tokenize(
-        model = model,
+        vocab = vocab,
         text = Ptr.copy(bytes),
         text_len = bytes.size,
         tokens = tokens,
@@ -188,10 +182,11 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     Scope.confined:
       val tokens = Ptr.copy(res)
       val numTokens = llama.llama_token_to_piece(
-        model = model,
+        vocab = vocab,
         token = token,
         buf = tokens,
         length = res.size,
+        lstrip = 0,
         special = false
       )
       if numTokens < 0 then decode(token, pending, math.abs(numTokens))
@@ -203,160 +198,118 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   def evaluate(
       ids: Array[Int],
       past: Evaluated,
-      params: BatchParams
+      batch: BatchParams
   ): Evaluated =
     if ids.isEmpty then past
     else
-      val batches = ids.grouped(params.size)
+      val batches = ids.grouped(batch.logical)
       Scope.confined:
         for (batch, n) <- batches.zipWithIndex do
           llama.llama_decode(
             ctx = ctx,
             batch = llama.llama_batch_get_one(
               tokens = Ptr.copy(batch),
-              n_tokens = batch.size,
-              pos_0 = (past + n * params.size).toInt,
-              seq_id = 0
+              n_tokens = batch.size
             )
           )
       past + ids.size
 
-  def sample(
-      repeatTokens: Array[Int],
-      sampling: Sampling,
-      logitBias: Map[Int, Float],
-      idx: Int = 0
-  ): Sample =
-    import Sampling.*
+  def createSampler(params: Sampling): Llama.Sampler =
+    val sparams = llama.llama_sampler_chain_default_params()
+    val chain = llama.llama_sampler_chain_init(sparams)
+    val add = llama.llama_sampler_chain_add(chain, _)
+    params match
+      case config: Sampling.Dist =>
+        Scope.confined:
+          if !config.logitBias.isEmpty then
+            val logitBias = config.logitBias.map(Llama.LogitBias(_, _))
+            add(
+              llama.llama_sampler_init_logit_bias(
+                vocabSize,
+                config.logitBias.size,
+                Ptr.copy(logitBias.toArray)
+              )
+            )
 
-    Scope.confined:
-      val logits = llama.llama_get_logits_ith(ctx, idx).asArray(vocabSize)
-        .unsafeArray
-      logitBias.foreach((token, bias) => logits(token) = bias)
-
-      val tokenData = Array.tabulate[Llama.TokenData](vocabSize): tokenId =>
-        Llama.TokenData(id = tokenId, logit = logits(tokenId), p = .0)
-
-      val data = Ptr.copy(tokenData)
-
-      val candidates = Ptr.copy(
-        Llama.TokenDataArray(
-          data = data,
-          size = SizeT(tokenData.size.toShort),
-          sorted = false
-        )
-      )
-
-      val repeatLastTokens = Ptr.copy(repeatTokens)
-      val repeatTokensSize = SizeT(repeatTokens.size.toShort)
-      llama.llama_sample_repetition_penalties(
-        ctx = ctx,
-        candidates = candidates,
-        last_tokens = repeatLastTokens,
-        penalty_last_n = repeatTokensSize,
-        penalty_repeat = sampling.penalty.repeat,
-        penalty_freq = sampling.penalty.frequency,
-        penalty_present = sampling.penalty.presence
-      )
-
-      if !sampling.penalty.penalizeNewLines then
-        val newLineLogit = logits(newLineToken)
-        val newLineIndex = tokenData.indexWhere(_.id == newLineToken)
-        if newLineIndex != -1 then
-          !data(newLineIndex) = (!data(newLineIndex)).copy(logit = newLineLogit)
-
-      val tokenId = sampling match
-        case Greedy(_, _, logprobs) =>
-          if logprobs > 0 then
-            llama.llama_sample_softmax(ctx, candidates)
-            (!data).id
-          else llama.llama_sample_token_greedy(ctx, candidates)
-
-        case MirostatV1(_, _, _, temp, tau, eta, m, muCoef) =>
-          llama.llama_sample_temp(ctx, candidates, temp)
-          llama.llama_sample_token_mirostat(
-            ctx = ctx,
-            candidates = candidates,
-            tau = tau,
-            eta = eta,
-            m = m,
-            mu = Ptr.copy(muCoef * tau)
-          )
-
-        case MirostatV2(_, _, _, temp, tau, eta, muCoef) =>
-          llama.llama_sample_temp(ctx, candidates, temp)
-          llama.llama_sample_token_mirostat_v2(
-            ctx = ctx,
-            candidates = candidates,
-            tau = tau,
-            eta = eta,
-            mu = Ptr.copy(muCoef * tau)
-          )
-
-        case Random(
-              _,
-              _,
-              logprobs,
-              temp,
-              topK,
-              tfsZ,
-              typicalP,
-              topP,
-              minP,
-              dynatemp,
-              samplers
-            ) =>
-          val topk = topK.filter(_ > 0).getOrElse(vocabSize)
-          val minKeep = SizeT(math.max(1, logprobs).toShort)
-          samplers.foreach:
-            case Sampler.TOP_K =>
-              llama.llama_sample_top_k(ctx, candidates, topk, minKeep)
-            case Sampler.TAIL_FREE =>
-              llama.llama_sample_tail_free(ctx, candidates, tfsZ, minKeep)
-            case Sampler.TYPICAL =>
-              llama.llama_sample_typical(ctx, candidates, typicalP, minKeep)
-            case Sampler.TOP_P =>
-              llama.llama_sample_top_p(ctx, candidates, topP, minKeep)
-            case Sampler.MIN_P =>
-              llama.llama_sample_min_p(ctx, candidates, minP, minKeep)
-            case Sampler.TEMPERATURE =>
-              if dynatemp.range > 0 then
-                val dynatemp_min = math.max(.0f, temp - dynatemp.range)
-                val dynatemp_max = math.max(.0f, temp + dynatemp.range)
-                llama.llama_sample_entropy(
-                  ctx = ctx,
-                  candidates_p = candidates,
-                  min_temp = dynatemp_min,
-                  max_temp = dynatemp_max,
-                  exponent_val = dynatemp.exponent
+          for sampler <- config.samplers do
+            val minKeep = SizeT(config.minKeep)
+            sampler match
+              case SamplerType.DRY =>
+                val seqBreakers = config.dry.seqBreakers.map(_.toByte)
+                add(
+                  llama.llama_sampler_init_dry(
+                    llama.llama_model_get_vocab(model),
+                    llama.llama_model_n_ctx_train(model),
+                    config.dry.multiplier,
+                    config.dry.base,
+                    config.dry.allowedLength,
+                    config.dry.penaltyLastN,
+                    Ptr.copy(Ptr.copy(seqBreakers.toArray)),
+                    SizeT(seqBreakers.size.toShort)
+                  )
                 )
-              else llama.llama_sample_temp(ctx, candidates, temp)
-          llama.llama_sample_token(ctx, candidates)
 
-      Sample(tokenId, logprob(tokenId, data, sampling.logprobs))
-  end sample
+              case SamplerType.TOP_K =>
+                add(llama.llama_sampler_init_top_k(config.topK))
 
-  def logprob(
-      id: Int,
-      data: Ptr[Llama.TokenData],
-      num: Int
-  ): Option[Probability] =
-    def tokenValue(tokenId: Int): String =
-      decode(tokenId) match
-        case token: String => token
-        case bytes: Array[Byte] =>
-          bytes.map(b => s"\\\\x${String.format("%02x", b)}").mkString
+              case SamplerType.TOP_P =>
+                add(llama.llama_sampler_init_top_p(config.topP, minKeep))
 
-    if num > 0 then
-      val log = (td: Llama.TokenData) => math.log(td.p)
-      val cap = math.min(num, vocabSize)
-      val logprobs = data.asArray(cap).unsafeArray.map: td =>
-        Logprob(tokenValue(td.id), log(td))
-      val current = LazyList.range(0, vocabSize).map(!data(_)).find(_.id == id)
-      val logprob = Logprob(tokenValue(id), current.fold(.0)(log))
-      Some(Probability(logprob, logprobs))
-    else None
+              case SamplerType.MIN_P =>
+                add(llama.llama_sampler_init_min_p(config.minP, minKeep))
 
-  def close(suffix: Vector[Token]): LazyList[Token] =
+              case SamplerType.XTC =>
+                add(
+                  llama.llama_sampler_init_xtc(
+                    config.xtc.probability,
+                    config.xtc.threshold,
+                    minKeep,
+                    config.seed
+                  )
+                )
+
+              case SamplerType.TYPICAL_P =>
+                add(
+                  llama.llama_sampler_init_typical(
+                    config.typicalP,
+                    minKeep
+                  )
+                )
+
+              case SamplerType.TEMPERATURE =>
+                add(
+                  llama.llama_sampler_init_temp_ext(
+                    config.temp,
+                    config.dynatemp.range,
+                    config.dynatemp.exponent
+                  )
+                )
+
+              case SamplerType.PENALTIES =>
+                add(
+                  llama.llama_sampler_init_penalties(
+                    config.penalty.lastN,
+                    config.penalty.repeat,
+                    config.penalty.frequency,
+                    config.penalty.presence
+                  )
+                )
+
+          if config.greedy then add(llama.llama_sampler_init_greedy())
+          else add(llama.llama_sampler_init_dist(config.seed))
+
+      case Sampling.Mirostat1(seed, temp, tau, eta, m) =>
+        add(llama.llama_sampler_init_temp(temp))
+        add(llama.llama_sampler_init_mirostat(vocabSize, seed, tau, eta, m))
+
+      case Sampling.Mirostat2(seed, temp, tau, eta) =>
+        add(llama.llama_sampler_init_temp(temp))
+        add(llama.llama_sampler_init_mirostat_v2(seed, tau, eta))
+
+    chain
+  end createSampler
+
+  def close(suffix: Vector[Token], sampler: Llama.Sampler): LazyList[Token] =
+    llama.llama_sampler_free(sampler)
     llama.llama_free(ctx)
     LazyList.from(suffix)

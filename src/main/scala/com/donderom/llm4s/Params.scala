@@ -7,9 +7,8 @@ import Llama.{NumaStrategy, RopeScalingType}
 object Default:
   val threads = Runtime.getRuntime.availableProcessors
 
-  val penalty: Penalty = Penalty()
-  val repeatLastTokens: Int = 64
   val logprobs: Int = 0
+  val seed: Int = 0xfffffff
   val temp: Float = .8f
   object Mirostat:
     val tau: Float = 5.0f
@@ -17,19 +16,16 @@ object Default:
     val muCoef: Float = 2.0f
 
 final case class LoraParams(
-    adapter: Option[Path] = None,
-    base: Option[Path] = None,
-    scale: Float = 1.0f,
-    threads: Int = Default.threads
+    path: Path,
+    scale: Float = 1.0f
 )
 
 final case class ModelParams(
-    gpuLayers: Int = 0,
+    gpuLayers: Int = -1,
     mainGpu: Int = 0,
     mmap: Boolean = true,
     mlock: Boolean = false,
-    numa: NumaStrategy = NumaStrategy.DISABLED,
-    lora: LoraParams = LoraParams()
+    numa: NumaStrategy = NumaStrategy.DISABLED
 )
 
 final case class RopeParams(
@@ -46,13 +42,16 @@ final case class YarnParams(
     origCtx: Int = 0
 )
 
-final case class BatchParams(size: Int = 512, threads: Int = Default.threads)
+final case class BatchParams(
+    logical: Int = 2048,
+    physical: Int = 512,
+    threads: Int = Default.threads
+)
 
 final case class GroupAttention(factor: Int = 1, width: Int = 512)
 
 final case class ContextParams(
-    seed: Int = -1,
-    size: Int = 512,
+    size: Int = 4096,
     threads: Int = Default.threads,
     batch: BatchParams = BatchParams(),
     rope: RopeParams = RopeParams(),
@@ -60,10 +59,23 @@ final case class ContextParams(
 )
 
 final case class Penalty(
-    repeat: Float = 1.10f,
+    lastN: Int = 64,
+    repeat: Float = 1.0f,
     frequency: Float = .0f,
-    presence: Float = .0f,
-    penalizeNewLines: Boolean = true
+    presence: Float = .0f
+)
+
+final case class Dry(
+    multiplier: Float = .0f,
+    base: Float = 1.75f,
+    allowedLength: Int = 2,
+    penaltyLastN: Int = -1,
+    seqBreakers: Seq[Char] = Seq[Char]('\n', ':', '"', '*')
+)
+
+final case class Xtc(
+    probability: Float = .0f,
+    threshold: Float = 0.10f
 )
 
 final case class Dynatemp(
@@ -71,63 +83,50 @@ final case class Dynatemp(
     exponent: Float = 1.0f
 )
 
-enum Sampler:
-  case TOP_K, TAIL_FREE, TYPICAL, TOP_P, MIN_P, TEMPERATURE
+enum SamplerType:
+  case PENALTIES, DRY, TOP_K, TYPICAL_P, TOP_P, MIN_P, XTC, TEMPERATURE
 
-enum Sampling(
-    val penalty: Penalty,
-    val repeatLastTokens: Int,
-    val logprobs: Int
-):
-  case Greedy(
-      override val penalty: Penalty = Default.penalty,
-      override val repeatLastTokens: Int = Default.repeatLastTokens,
-      override val logprobs: Int = Default.logprobs
-  ) extends Sampling(penalty, repeatLastTokens, logprobs)
-
-  case MirostatV1(
-      override val penalty: Penalty = Default.penalty,
-      override val repeatLastTokens: Int = Default.repeatLastTokens,
-      override val logprobs: Int = Default.logprobs,
-      temp: Float = Default.temp,
-      tau: Float = Default.Mirostat.tau,
-      eta: Float = Default.Mirostat.eta,
-      m: Int = 100,
-      muCoef: Float = Default.Mirostat.muCoef
-  ) extends Sampling(penalty, repeatLastTokens, logprobs)
-
-  case MirostatV2(
-      override val penalty: Penalty = Default.penalty,
-      override val repeatLastTokens: Int = Default.repeatLastTokens,
-      override val logprobs: Int = Default.logprobs,
-      temp: Float = Default.temp,
-      tau: Float = Default.Mirostat.tau,
-      eta: Float = Default.Mirostat.eta,
-      muCoef: Float = Default.Mirostat.muCoef
-  ) extends Sampling(penalty, repeatLastTokens, logprobs)
-
-  case Random(
-      override val penalty: Penalty = Default.penalty,
-      override val repeatLastTokens: Int = Default.repeatLastTokens,
-      override val logprobs: Int = Default.logprobs,
-      temp: Float = Default.temp,
-      topK: Option[Int] = Some(40),
-      tfsZ: Float = 1.0f,
+enum Sampling:
+  case Dist(
+      greedy: Boolean = false,
+      samplers: List[SamplerType] = SamplerType.values.toList,
+      seed: Int = Default.seed,
+      logitBias: Map[Int, Float] = Map(),
+      penalty: Penalty = Penalty(),
+      dry: Dry = Dry(),
+      minKeep: Short = 0,
+      topK: Int = 40,
       typicalP: Float = 1.0f,
-      topP: Float = .95f,
-      minP: Float = .05f,
-      dynatemp: Dynatemp = Dynatemp(),
-      samplers: List[Sampler] = Sampler.values.toList
-  ) extends Sampling(penalty, repeatLastTokens, logprobs)
+      topP: Float = 0.95f,
+      minP: Float = 0.05f,
+      xtc: Xtc = Xtc(),
+      temp: Float = Default.temp,
+      dynatemp: Dynatemp = Dynatemp()
+  )
+
+  case Mirostat1(
+      seed: Int = Default.seed,
+      temp: Float = Default.temp,
+      tau: Float = Default.Mirostat.tau,
+      eta: Float = Default.Mirostat.eta,
+      m: Int = 100
+  )
+
+  case Mirostat2(
+      seed: Int = Default.seed,
+      temp: Float = Default.temp,
+      tau: Float = Default.Mirostat.tau,
+      eta: Float = Default.Mirostat.eta
+  )
 
 final case class LlmParams(
     context: ContextParams = ContextParams(),
-    sampling: Sampling = Sampling.Random(),
+    sampling: Sampling = Sampling.Dist(),
     predictTokens: Int = -1,
     keepTokens: Int = 0,
-    logitBias: Map[Int, Float] = Map(),
     suffix: Option[String] = None,
     echo: Boolean = true,
     stopSeqs: List[String] = Nil,
-    groupAttention: GroupAttention = GroupAttention()
+    groupAttention: GroupAttention = GroupAttention(),
+    lora: Option[LoraParams] = None
 )

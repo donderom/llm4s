@@ -5,6 +5,7 @@ import java.nio.file.Path
 import scala.util.Try
 
 import fr.hammons.slinc.runtime.given
+import fr.hammons.slinc.types.SizeT
 import fr.hammons.slinc.{FSet, Ptr, Scope, Slinc}
 
 final case class Logprob(token: String, value: Double)
@@ -34,11 +35,16 @@ object Llm:
       val llm = createModel(model, params)
 
       def generate(prompt: String, params: LlmParams): Try[Usage] =
-        for ctx <- createContext(llm, params.context, false)
+        for
+          llm <- llm
+          ctx <- createContext(llm, params.context, false)
+          _ <- loadLora(llm, ctx, params.lora)
         yield SlincLlm(ctx).generate(prompt, params)
 
       def embeddings(prompt: String, params: ContextParams): Try[Array[Float]] =
-        for ctx <- createContext(llm, params, true)
+        for
+          llm <- llm
+          ctx <- createContext(llm, params, true)
         yield SlincLlm(ctx).embeddings(prompt, params.batch)
 
       def close(): Unit =
@@ -46,20 +52,18 @@ object Llm:
           llama <- binding
           llm <- llm
         do
-          llama.llama_free_model(llm)
+          llama.llama_model_free(llm)
           llama.llama_backend_free()
 
       private def createModel(
           model: Path,
           params: ModelParams
       ): Try[Llama.Model] =
-        binding.foreach: llama =>
+        binding.map: llama =>
           llama.llama_backend_init()
           llama.llama_numa_init(params.numa)
-
-        Scope.global:
-          val baseModel = binding.map: llama =>
-            llama.llama_load_model_from_file(
+          Scope.confined:
+            llama.llama_model_load_from_file(
               path_model = Ptr.copy(model.toAbsolutePath.toString),
               params = llama.llama_model_default_params().copy(
                 n_gpu_layers = params.gpuLayers,
@@ -69,31 +73,14 @@ object Llm:
               )
             )
 
-          params.lora.adapter.fold(baseModel): loraAdapter =>
-            val err =
-              for
-                llama <- binding
-                llm <- baseModel
-                loraBase = params.lora.base.fold(Slinc.getRuntime().Null):
-                  base => Ptr.copy(base.toAbsolutePath.toString)
-              yield llama.llama_model_apply_lora_from_file(
-                model = llm,
-                path_lora = Ptr.copy(loraAdapter.toAbsolutePath.toString),
-                scale = params.lora.scale,
-                path_base_model = loraBase,
-                n_threads = params.lora.threads
-              )
-            err.filter(_ == 0).flatMap(_ => baseModel)
-
       private def createContext(
-          llm: Try[Llama.Model],
+          llm: Llama.Model,
           contextParams: ContextParams,
           embedding: Boolean
       ): Try[Llama.Ctx] =
         for
           llama <- binding
-          llm <- llm
-          ctx = llama.llama_new_context_with_model(
+          ctx = llama.llama_init_from_model(
             model = llm,
             params = llamaParams(
               llama.llama_context_default_params(),
@@ -103,15 +90,34 @@ object Llm:
           ) if ctx != Slinc.getRuntime().Null
         yield ctx
 
+      private def loadLora(
+          llm: Llama.Model,
+          ctx: Llama.Ctx,
+          loraParams: Option[LoraParams]
+      ): Try[Unit] =
+        loraParams.fold(Try(())): params =>
+          Scope.confined:
+            for
+              llama <- binding
+              adapter <- Try(
+                llama.llama_adapter_lora_init(
+                  llm,
+                  Ptr.copy(params.path.toAbsolutePath.toString)
+                )
+              )
+              if adapter != Slinc.getRuntime().Null
+              _ <- Try(llama.llama_set_adapter_lora(ctx, adapter, params.scale))
+            yield ()
+
       private def llamaParams(
           defaultParams: Llama.ContextParams,
           params: ContextParams,
           embedding: Boolean
       ): Llama.ContextParams =
         defaultParams.copy(
-          seed = params.seed,
           n_ctx = params.size,
-          n_batch = params.batch.size,
+          n_batch = params.batch.logical,
+          n_ubatch = params.batch.physical,
           n_threads = params.threads,
           n_threads_batch = params.batch.threads,
           rope_scaling_type = params.rope.scalingType,
