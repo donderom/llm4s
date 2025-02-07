@@ -2,7 +2,7 @@ package com.donderom.llm4s
 
 import java.nio.file.Path
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.types.SizeT
@@ -93,21 +93,35 @@ object Llm:
       private def loadLora(
           llm: Llama.Model,
           ctx: Llama.Ctx,
-          loraParams: Option[LoraParams]
+          lora: List[AdapterParams]
       ): Try[Unit] =
-        loraParams.fold(Try(())): params =>
-          Scope.confined:
-            for
-              llama <- binding
-              adapter <- Try(
-                llama.llama_adapter_lora_init(
-                  llm,
-                  Ptr.copy(params.path.toAbsolutePath.toString)
-                )
+        lora.map(loadAdapter(llm, ctx, _)).foldLeft(Try(())):
+          case (acc, Success(_)) => acc
+          case (_, failure)      => failure
+
+      private def loadAdapter(
+          llm: Llama.Model,
+          ctx: Llama.Ctx,
+          params: AdapterParams
+      ): Try[Unit] =
+        Scope.confined:
+          for
+            llama <- binding
+            adapter <- Try(
+              llama.llama_adapter_lora_init(
+                model = llm,
+                path_lora = Ptr.copy(params.path.toAbsolutePath.toString)
               )
-              if adapter != Slinc.getRuntime().Null
-              _ <- Try(llama.llama_set_adapter_lora(ctx, adapter, params.scale))
-            yield ()
+            )
+            if adapter != Slinc.getRuntime().Null
+            _ <- Try(
+              llama.llama_set_adapter_lora(
+                ctx = ctx,
+                adapter = adapter,
+                scale = params.scale
+              )
+            )
+          yield ()
 
       private def llamaParams(
           defaultParams: Llama.ContextParams,

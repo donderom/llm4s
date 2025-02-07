@@ -15,7 +15,7 @@ object Default:
     val eta: Float = .1f
     val muCoef: Float = 2.0f
 
-final case class LoraParams(
+final case class AdapterParams(
     path: Path,
     scale: Float = 1.0f
 )
@@ -128,5 +128,5 @@ final case class LlmParams(
     echo: Boolean = true,
     stopSeqs: List[String] = Nil,
     groupAttention: GroupAttention = GroupAttention(),
-    lora: Option[LoraParams] = None
+    lora: List[AdapterParams] = Nil
 )
