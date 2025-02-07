@@ -1,12 +1,12 @@
 package com.donderom.llm4s
 
-import java.nio.file.Path
-
-import scala.util.{Success, Try}
-
 import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.types.SizeT
 import fr.hammons.slinc.{FSet, Ptr, Scope, Slinc}
+
+import java.nio.file.Path
+
+import scala.util.{Success, Try}
 
 final case class Logprob(token: String, value: Double)
 final case class Probability(logprob: Logprob, candidates: Array[Logprob])

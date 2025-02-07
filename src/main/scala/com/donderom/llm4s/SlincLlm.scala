@@ -1,13 +1,13 @@
 package com.donderom.llm4s
 
+import fr.hammons.slinc.runtime.given
+import fr.hammons.slinc.types.SizeT
+import fr.hammons.slinc.{FSet, Ptr, Scope}
+
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import scala.collection.mutable.ArrayDeque
-
-import fr.hammons.slinc.runtime.given
-import fr.hammons.slinc.types.SizeT
-import fr.hammons.slinc.{FSet, Ptr, Scope}
 
 import State.*
 
