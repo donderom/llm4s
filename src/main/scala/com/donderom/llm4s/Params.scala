@@ -119,6 +119,17 @@ enum Sampling:
       eta: Float = Default.Mirostat.eta
   )
 
+enum Norm:
+  case MaxAbsolute
+  case Taxicab
+  case Euclidean
+  case PNorm(p: Int)
+
+final case class EmbeddingParams(
+    context: ContextParams = ContextParams(),
+    norm: Option[Norm] = None
+)
+
 final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: Sampling = Sampling.Dist(),

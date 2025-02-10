@@ -137,13 +137,44 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
         case token: String => Token(token) #:: promptTokens(ids.tail, Array())
         case partial: Array[Byte] => promptTokens(ids.tail, partial)
 
-  def embeddings(prompt: String, params: BatchParams): Array[Float] =
+  def embeddings(prompt: String, params: EmbeddingParams): Array[Float] =
     val ids = encode(prompt)
-    val _ = evaluate(ids, Evaluated.none, params)
+    val _ = evaluate(ids, Evaluated.none, params.context.batch)
     val size = llama.llama_model_n_embd(model)
     val embeddings = llama.llama_get_embeddings(ctx).asArray(size).unsafeArray
     llama.llama_free(ctx)
-    embeddings
+
+    def normalized(
+        f: (Float, Float) => Float,
+        post: Float => Float = identity
+    ) =
+      val sum = post(embeddings.foldLeft(0.0f)(f))
+      val norm = if sum > 0.0f then 1.0f / sum else 0.0f
+      embeddings.map(_ * norm)
+
+    params.norm match
+      case Some(Norm.MaxAbsolute) =>
+        normalized(
+          (sum, emb) =>
+            val absEmb = math.abs(emb)
+            if sum < absEmb then absEmb else sum
+          ,
+          _ / 32760.0f
+        )
+      case Some(Norm.Taxicab) =>
+        normalized((sum, emb) => sum + math.abs(emb))
+      case Some(Norm.Euclidean) =>
+        normalized(
+          (sum, emb) => sum + emb * emb,
+          sum => math.sqrt(sum).toFloat
+        )
+      case Some(Norm.PNorm(p)) =>
+        normalized(
+          (sum, emb) => sum + math.pow(math.abs(emb), p).toFloat,
+          sum => math.pow(sum, 1.0 / p).toFloat
+        )
+      case _ => embeddings
+  end embeddings
 
   lazy val ctxSize: Int = llama.llama_n_ctx(ctx)
   lazy val vocab: Llama.Vocab = llama.llama_model_get_vocab(model)

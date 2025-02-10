@@ -17,9 +17,9 @@ trait Llm(val modelPath: Path) extends AutoCloseable:
   def generate(prompt: String, params: LlmParams): Try[Usage]
 
   def embeddings(prompt: String): Try[Array[Float]] =
-    embeddings(prompt, ContextParams())
+    embeddings(prompt, EmbeddingParams())
 
-  def embeddings(prompt: String, params: ContextParams): Try[Array[Float]]
+  def embeddings(prompt: String, params: EmbeddingParams): Try[Array[Float]]
 
   def apply(prompt: String): Try[LazyList[String]] = apply(prompt, LlmParams())
 
@@ -41,11 +41,14 @@ object Llm:
           _ <- loadLora(llm, ctx, params.lora)
         yield SlincLlm(ctx).generate(prompt, params)
 
-      def embeddings(prompt: String, params: ContextParams): Try[Array[Float]] =
+      def embeddings(
+          prompt: String,
+          params: EmbeddingParams
+      ): Try[Array[Float]] =
         for
           llm <- llm
-          ctx <- createContext(llm, params, true)
-        yield SlincLlm(ctx).embeddings(prompt, params.batch)
+          ctx <- createContext(llm, params.context, true)
+        yield SlincLlm(ctx).embeddings(prompt, params)
 
       def close(): Unit =
         for
