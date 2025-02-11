@@ -239,7 +239,8 @@ object Llama:
       split_mode: SplitMode,
       main_gpu: CInt,
       tensor_split: Ptr[CFloat],
-      progress_callback: Ptr[(CFloat, Unit) => Unit],
+      // Callbacks are not supported yet
+      progress_callback: Ptr[(CFloat, Any) => CBool],
       progress_callback_user_data: Ptr[Unit],
       kv_overrides: Ptr[ModelKvOverride],
       vocab_only: CBool,
@@ -338,6 +339,7 @@ object Llama:
       yarn_beta_slow: CFloat,
       yarn_orig_ctx: CInt,
       defrag_thold: CFloat,
+      // Callbacks are not supported yet
       cb_eval: Ptr[Any],
       cb_eval_user_data: Ptr[Any],
       type_k: GgmlType,
@@ -347,6 +349,7 @@ object Llama:
       offload_kqv: CBool,
       flash_attn: CBool,
       no_perf: CBool,
+      // Callbacks are not supported yet
       abort_callback: Ptr[Any],
       abort_callback_data: Ptr[Any]
   ) derives Struct
