@@ -4,7 +4,6 @@ import org.scalatest.*
 import flatspec.*
 import matchers.*
 
-
 class StopSpec extends AnyFlatSpec with should.Matchers:
   val defaultTokens =
     Array[String]("a", "b", "c", "d", "e", "f", "g", "h", "i", "j")
@@ -29,10 +28,8 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
       defaultTokens.scanRight("")(_ + _).slice(1, defaultTokens.size)
     val expected =
       defaultTokens.scanLeft("")(_ + _).slice(1, defaultTokens.size)
-    val matches = suffixes
-      .zip(expected)
-      .map: (s, e) =>
-        defaultStream(List(s)).mkString == e
+    val matches = suffixes.zip(expected).map: (s, e) =>
+      defaultStream(List(s)).mkString == e
     all(matches) should be(true)
 
   it should "release in flight tokens if end of stream is reached" in:
@@ -49,11 +46,10 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
     defaultStream(List("bc", "abc")) should contain only ("a")
 
   it should "handle repeating tokens" in:
-    val res = stream(
+    stream(
       Array("cast", "int", "to", "int"),
       List("inttointeger", "inttoint")
-    )
-    res should contain only ("cast")
+    ) should contain only ("cast")
 
   it should "release prefix if token is to be split" in:
     stream(Array("mono", "ch"), List("no")) should contain only ("mo")
@@ -64,6 +60,12 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
 
   it should "handle unicode tokens" in:
     stream(Array(",", " ", "😍"), List("😍")) should contain only (",", " ")
+
+  it should "not join prefix if it's not contiguous" in:
+    stream(
+      Array("then", " fine", "-t", "une"),
+      List("ne-t")
+    ) should contain only ("then fi")
 
   private def stream(
       tokens: Array[String],

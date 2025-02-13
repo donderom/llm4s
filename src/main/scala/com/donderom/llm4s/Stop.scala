@@ -62,8 +62,10 @@ object Stop:
 
               // Partial match
               case Some(Match.Partial(offset)) =>
-                val prfx = tokenText.substring(offset)
-                val newPrefix = prefix.fold(prfx)(_ + prfx)
+                val newPrefix = (prefix, offset) match
+                  // Prefix is contiguous only if offset is zero
+                  case (Some(p), 0) => p + tokenText.substring(offset)
+                  case _            => tokenText.substring(offset)
                 val prefixes = state.prefixes.updated(seqIdx, newPrefix)
                 action(tail, state.copy(prefixes = prefixes), usedBy + seqIdx)
 
