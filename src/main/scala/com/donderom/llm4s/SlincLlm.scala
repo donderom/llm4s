@@ -24,12 +24,15 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     val sampler = createSampler(params.sampling)
     val lastTokens = new ArrayDeque[Int](ctxSize)
     val stop = Stop.Acc[Token](params.stopSeqs)
+    val ids = encode(prompt)
+    val keepTokens =
+      if params.keepTokens < 0 || params.keepTokens > ids.size then ids.size
+      else params.keepTokens + (if addBos then 1 else 0)
 
     def eval(evaluated: Evaluated): Evaluated =
       val past =
         if evaluated.incr.toInt > ctxSize then
           if params.groupAttention.factor == 1 then
-            val keepTokens = params.keepTokens + (if addBos then 1 else 0)
             val left = evaluated.toInt - keepTokens
             val discard = left / 2
             llama.llama_kv_cache_seq_rm(
@@ -120,8 +123,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
       else close(state.stop.deferred(params.suffix), sampler)
     end tokens
 
-    val ids = encode(prompt)
     ids.foreach(lastTokens.append)
+
     val gen = (e: Evaluated) => tokens(State[Token](params.predictTokens, e))
     Usage(
       ids.size,
@@ -184,10 +187,12 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   def keepGenerating(token: Int): Boolean =
     !llama.llama_vocab_is_eog(vocab, token)
 
+  // Reserve capacity for BOS and EOS tokens (used by tokenize)
+  val specialTokensNum = 2
+
   def encode(text: String): Array[Int] =
-    val bos = if addBos then 1 else 0
     val bytes = text.getBytes(StandardCharsets.UTF_8)
-    val res = new Array[Int](bytes.size + bos)
+    val res = new Array[Int](bytes.size + specialTokensNum)
     Scope.confined:
       val tokens = Ptr.copy(res)
       val numTokens = llama.llama_tokenize(
@@ -196,7 +201,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
         text_len = bytes.size,
         tokens = tokens,
         n_tokens_max = res.size,
-        add_special = addBos,
+        add_special = true,
         parse_special = true
       )
       tokens.asArray(math.min(numTokens, ctxSize)).unsafeArray
