@@ -145,5 +145,6 @@ object Llm:
           yarn_beta_fast = params.yarn.betaFast,
           yarn_beta_slow = params.yarn.betaSlow,
           yarn_orig_ctx = params.yarn.origCtx,
+          flash_attn = params.flashAttention,
           embeddings = embedding
         )

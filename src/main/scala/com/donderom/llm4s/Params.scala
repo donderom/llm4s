@@ -55,7 +55,8 @@ final case class ContextParams(
     threads: Int = Default.threads,
     batch: BatchParams = BatchParams(),
     rope: RopeParams = RopeParams(),
-    yarn: YarnParams = YarnParams()
+    yarn: YarnParams = YarnParams(),
+    flashAttention: Boolean = false
 )
 
 final case class Penalty(
