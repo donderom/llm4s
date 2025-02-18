@@ -125,19 +125,35 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
 
     ids.foreach(lastTokens.append)
 
+    // Support encoder-decoder models
+    val encoder = llama.llama_model_has_encoder(model)
+    if encoder then
+      Scope.confined:
+        llama.llama_encode(
+          ctx = ctx,
+          batch = llama.llama_batch_get_one(Ptr.copy(ids), ids.size)
+        )
+      val decStartToken = llama.llama_model_decoder_start_token(model)
+      if !nullToken(decStartToken) then lastTokens.append(decStartToken)
+      else lastTokens.append(llama.llama_vocab_bos(vocab))
+
     val gen = (e: Evaluated) => tokens(State[Token](params.predictTokens, e))
     Usage(
       ids.size,
-      if params.echo then promptTokens(ids, Array()) #::: gen(Evaluated.none)
+      if encoder then gen(Evaluated(ids.size))
+      else if params.echo then promptTokens(ids) #::: gen(Evaluated.none)
       else gen(evaluate(ids, Evaluated.none, params.context.batch))
     )
   end generate
+
+  def promptTokens(ids: Array[Int]): LazyList[Token] =
+    promptTokens(ids, Array())
 
   def promptTokens(ids: Array[Int], pending: Array[Byte]): LazyList[Token] =
     if ids.isEmpty then LazyList.empty
     else
       decode(ids.head, pending) match
-        case token: String => Token(token) #:: promptTokens(ids.tail, Array())
+        case token: String        => Token(token) #:: promptTokens(ids.tail)
         case partial: Array[Byte] => promptTokens(ids.tail, partial)
 
   def embeddings(prompt: String, params: EmbeddingParams): Array[Float] =
@@ -183,6 +199,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val vocab: Llama.Vocab = llama.llama_model_get_vocab(model)
   lazy val vocabSize: Int = llama.llama_vocab_n_tokens(vocab)
   lazy val addBos: Boolean = llama.llama_vocab_get_add_bos(vocab)
+
+  def nullToken(token: Int): Boolean = token == Llama.nullToken
 
   def keepGenerating(token: Int): Boolean =
     !llama.llama_vocab_is_eog(vocab, token)

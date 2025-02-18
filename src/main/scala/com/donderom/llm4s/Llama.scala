@@ -4,6 +4,8 @@ import fr.hammons.slinc.types.*
 import fr.hammons.slinc.{CUnion, FSet, Ptr, Struct, Transform}
 
 object Llama:
+  val nullToken = -1
+
   type Pos = CInt
   type Token = CInt
   type SeqId = CInt
