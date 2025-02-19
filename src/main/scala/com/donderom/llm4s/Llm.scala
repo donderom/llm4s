@@ -4,26 +4,35 @@ import fr.hammons.slinc.runtime.given
 import fr.hammons.slinc.types.SizeT
 import fr.hammons.slinc.{FSet, Ptr, Scope, Slinc}
 
-import java.nio.file.Path
-
-import scala.util.{Success, Try}
+import java.nio.file.{Files, Path}
 
 final case class Logprob(token: String, value: Double)
 final case class Probability(logprob: Logprob, candidates: Array[Logprob])
 final case class Token(value: String, probs: Vector[Probability] = Vector.empty)
 final case class Usage(promptSize: Int, tokens: LazyList[Token])
 
-trait Llm(val modelPath: Path) extends AutoCloseable:
-  def generate(prompt: String, params: LlmParams): Try[Usage]
+enum LlmError(message: String) extends Exception(message):
+  case ModelError(message: String) extends LlmError(message)
+  case ConfigError(message: String) extends LlmError(message)
 
-  def embeddings(prompt: String): Try[Array[Float]] =
+import LlmError.ModelError
+
+type Result[A] = Either[LlmError, A]
+object Result:
+  def unit: Result[Unit] = Right(())
+
+trait Llm(val modelPath: Path) extends AutoCloseable:
+  def generate(prompt: String, params: LlmParams): Result[Usage]
+
+  def embeddings(prompt: String): Result[Array[Float]] =
     embeddings(prompt, EmbeddingParams())
 
-  def embeddings(prompt: String, params: EmbeddingParams): Try[Array[Float]]
+  def embeddings(prompt: String, params: EmbeddingParams): Result[Array[Float]]
 
-  def apply(prompt: String): Try[LazyList[String]] = apply(prompt, LlmParams())
+  def apply(prompt: String): Result[LazyList[String]] =
+    apply(prompt, LlmParams())
 
-  def apply(prompt: String, params: LlmParams): Try[LazyList[String]] =
+  def apply(prompt: String, params: LlmParams): Result[LazyList[String]] =
     generate(prompt, params).map(_.tokens.map(_.value))
 
 object Llm:
@@ -31,28 +40,30 @@ object Llm:
 
   def apply(model: Path, params: ModelParams): Llm =
     new Llm(model):
-      val binding = Try(FSet.instance[Llama])
+      val api = catchNonFatal(FSet.instance[Llama])("Cannot load libllama")
       val llm = createModel(model, params)
 
-      def generate(prompt: String, params: LlmParams): Try[Usage] =
+      def generate(prompt: String, params: LlmParams): Result[Usage] =
         for
           llm <- llm
-          ctx <- createContext(llm, params.context, false)
-          _ <- loadLora(llm, ctx, params.lora)
-        yield SlincLlm(ctx).generate(prompt, params)
+          config <- LlmParams.parse(params)
+          ctx <- createContext(llm, config.context, false)
+          _ <- loadLora(llm, ctx, config.lora)
+        yield SlincLlm(ctx).generate(prompt, config)
 
       def embeddings(
           prompt: String,
           params: EmbeddingParams
-      ): Try[Array[Float]] =
+      ): Result[Array[Float]] =
         for
           llm <- llm
-          ctx <- createContext(llm, params.context, true)
-        yield SlincLlm(ctx).embeddings(prompt, params)
+          config <- EmbeddingParams.parse(params)
+          ctx <- createContext(llm, config.context, true)
+        yield SlincLlm(ctx).embeddings(prompt, config)
 
       def close(): Unit =
         for
-          llama <- binding
+          llama <- api
           llm <- llm
         do
           llama.llama_model_free(llm)
@@ -61,70 +72,88 @@ object Llm:
       private def createModel(
           model: Path,
           params: ModelParams
-      ): Try[Llama.Model] =
-        binding.map: llama =>
-          llama.llama_backend_init()
-          llama.llama_numa_init(params.numa)
-          Scope.confined:
-            llama.llama_model_load_from_file(
-              path_model = Ptr.copy(model.toAbsolutePath.toString),
-              params = llama.llama_model_default_params().copy(
-                n_gpu_layers = params.gpuLayers,
-                main_gpu = params.mainGpu,
-                use_mmap = params.mmap,
-                use_mlock = params.mlock
+      ): Result[Llama.Model] =
+        val error = s"Cannot load the model $model"
+        for
+          llama <- api
+          path <- Either.cond(
+            Files.exists(model),
+            model,
+            ModelError(s"Model file $model does not exist")
+          )
+          _ <- catchNonFatal(llama.llama_backend_init())(
+            "Cannot load libllama backend"
+          )
+          _ <- catchNonFatal(llama.llama_numa_init(params.numa))(
+            s"Cannot init Numa (${params.numa})"
+          )
+          m <- catchNonFatal(
+            Scope.confined:
+              llama.llama_model_load_from_file(
+                path_model = Ptr.copy(path.toAbsolutePath.toString),
+                params = llama.llama_model_default_params().copy(
+                  n_gpu_layers = params.gpuLayers,
+                  main_gpu = params.mainGpu,
+                  use_mmap = params.mmap,
+                  use_mlock = params.mlock
+                )
               )
-            )
+          )(error).filterOrElse(notNull, ModelError(error))
+        yield m
 
       private def createContext(
           llm: Llama.Model,
-          contextParams: ContextParams,
+          params: ContextParams,
           embedding: Boolean
-      ): Try[Llama.Ctx] =
+      ): Result[Llama.Ctx] =
+        val error = s"Cannot initialize model context ($params)"
         for
-          llama <- binding
-          ctx = llama.llama_init_from_model(
-            model = llm,
-            params = llamaParams(
-              llama.llama_context_default_params(),
-              contextParams,
-              embedding
+          llama <- api
+          ctx <- catchNonFatal(
+            llama.llama_init_from_model(
+              model = llm,
+              params = llamaParams(
+                llama.llama_context_default_params(),
+                params,
+                embedding
+              )
             )
-          ) if ctx != Slinc.getRuntime().Null
+          )(error).filterOrElse(notNull, ModelError(error))
         yield ctx
 
       private def loadLora(
           llm: Llama.Model,
           ctx: Llama.Ctx,
           lora: List[AdapterParams]
-      ): Try[Unit] =
-        lora.map(loadAdapter(llm, ctx, _)).foldLeft(Try(())):
-          case (acc, Success(_)) => acc
-          case (_, failure)      => failure
+      ): Result[Unit] =
+        lora.map(loadAdapter(llm, ctx, _)).foldLeft(Result.unit):
+          case (acc, Right(_)) => acc
+          case (_, failure)    => failure
 
       private def loadAdapter(
           llm: Llama.Model,
           ctx: Llama.Ctx,
           params: AdapterParams
-      ): Try[Unit] =
-        Scope.confined:
-          for
-            llama <- binding
-            adapter <- Try(
+      ): Result[Unit] =
+        val error = s"Cannot initialize LoRA adapter ($params)"
+        for
+          llama <- api
+          config <- AdapterParams.parse(params)
+          adapter <- catchNonFatal(
+            Scope.confined:
               llama.llama_adapter_lora_init(
                 model = llm,
-                path_lora = Ptr.copy(params.path.toAbsolutePath.toString)
+                path_lora = Ptr.copy(config.path.toAbsolutePath.toString)
               )
+          )(error).filterOrElse(notNull, ModelError(error))
+          _ <- catchNonFatal(
+            llama.llama_set_adapter_lora(
+              ctx = ctx,
+              adapter = adapter,
+              scale = config.scale
             )
-            if adapter != Slinc.getRuntime().Null
-            _ <- Try(
-              llama.llama_set_adapter_lora(
-                ctx = ctx,
-                adapter = adapter,
-                scale = params.scale
-              )
-            )
-          yield ()
+          )(error)
+        yield ()
 
       private def llamaParams(
           defaultParams: Llama.ContextParams,
@@ -148,3 +177,11 @@ object Llm:
           flash_attn = params.flashAttention,
           embeddings = embedding
         )
+
+  private def catchNonFatal[A](f: => A)(reason: => String): Result[A] =
+    try Right(f)
+    catch
+      case t if scala.util.control.NonFatal(t) =>
+        Left(ModelError(s"$reason: ${t.getMessage}"))
+
+  private def notNull(ptr: Ptr[Any]): Boolean = ptr != Slinc.getRuntime().Null

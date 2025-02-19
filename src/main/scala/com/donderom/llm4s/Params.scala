@@ -1,7 +1,8 @@
 package com.donderom.llm4s
 
-import java.nio.file.Path
+import java.nio.file.{Files, Path}
 
+import LlmError.ConfigError
 import Llama.{NumaStrategy, RopeScalingType}
 
 object Default:
@@ -19,6 +20,11 @@ final case class AdapterParams(
     path: Path,
     scale: Float = 1.0f
 )
+
+object AdapterParams:
+  def parse(params: AdapterParams): Result[AdapterParams] =
+    if Files.exists(params.path) then Right(params)
+    else Left(ConfigError(s"LoRA adapter file ${params.path} does not exist"))
 
 final case class ModelParams(
     gpuLayers: Int = -1,
@@ -48,7 +54,25 @@ final case class BatchParams(
     threads: Int = Default.threads
 )
 
+object BatchParams:
+  def parse(params: BatchParams): Result[BatchParams] =
+    if params.logical < 1 then
+      Left(ConfigError("Logical batch size should be positive"))
+    else if params.physical < 1 then
+      Left(ConfigError("Batch size should be positive"))
+    else if params.threads < 1 then
+      Left(ConfigError("Batch threads should be positive"))
+    else Right(params)
+
 final case class GroupAttention(factor: Int = 1, width: Int = 512)
+
+object GroupAttention:
+  def parse(params: GroupAttention): Result[GroupAttention] =
+    if params.factor <= 0 then
+      Left(ConfigError("Group attention factor should be positive"))
+    else if params.width % params.factor != 0 then
+      Left(ConfigError("Group attention width should be a multiple of factor"))
+    else Right(params)
 
 final case class ContextParams(
     size: Int = 4096,
@@ -58,6 +82,19 @@ final case class ContextParams(
     yarn: YarnParams = YarnParams(),
     flashAttention: Boolean = false
 )
+
+object ContextParams:
+  def parse(params: ContextParams): Result[ContextParams] =
+    val config =
+      if params.size < 0 then
+        Left(ConfigError("Context size should be positive"))
+      else if params.threads < 1 then
+        Left(ConfigError("Context threads should be positive"))
+      else Right(params)
+    for
+      _ <- BatchParams.parse(params.batch)
+      config <- config
+    yield config
 
 final case class Penalty(
     lastN: Int = 64,
@@ -131,6 +168,11 @@ final case class EmbeddingParams(
     norm: Option[Norm] = None
 )
 
+object EmbeddingParams:
+  def parse(params: EmbeddingParams): Result[EmbeddingParams] =
+    for _ <- ContextParams.parse(params.context)
+    yield params
+
 final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: Sampling = Sampling.Dist(),
@@ -142,3 +184,10 @@ final case class LlmParams(
     groupAttention: GroupAttention = GroupAttention(),
     lora: List[AdapterParams] = Nil
 )
+
+object LlmParams:
+  def parse(params: LlmParams): Result[LlmParams] =
+    for
+      _ <- ContextParams.parse(params.context)
+      _ <- GroupAttention.parse(params.groupAttention)
+    yield params
