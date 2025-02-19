@@ -176,7 +176,7 @@ object EmbeddingParams:
 final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: Sampling = Sampling.Dist(),
-    predictTokens: Int = -1,
+    predictTokens: Option[Int] = None,
     keepTokens: Int = 0,
     suffix: Option[String] = None,
     echo: Boolean = true,
@@ -188,6 +188,11 @@ final case class LlmParams(
 object LlmParams:
   def parse(params: LlmParams): Result[LlmParams] =
     for
+      _ <- Either.cond(
+        params.predictTokens.fold(true)(_ >= 0),
+        params,
+        ConfigError("Number of tokens to predict cannot be negative")
+      )
       _ <- ContextParams.parse(params.context)
       _ <- GroupAttention.parse(params.groupAttention)
     yield params

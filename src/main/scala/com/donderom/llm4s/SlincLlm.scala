@@ -137,7 +137,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
       if !nullToken(decStartToken) then lastTokens.append(decStartToken)
       else lastTokens.append(llama.llama_vocab_bos(vocab))
 
-    val gen = (e: Evaluated) => tokens(State[Token](params.predictTokens, e))
+    val predictTokens = params.predictTokens.getOrElse(-1)
+    val gen = (e: Evaluated) => tokens(State[Token](predictTokens, e))
     Usage(
       ids.size,
       if encoder then gen(Evaluated(ids.size))
