@@ -11,13 +11,17 @@ object Default:
   val logprobs: Int = 0
   val seed: Int = 0xfffffff
   val temp: Float = .8f
+
   object Mirostat:
+    // Target entropy
     val tau: Float = 5.0f
+    // Learning rate
     val eta: Float = .1f
-    val muCoef: Float = 2.0f
 
 final case class AdapterParams(
+    // Path to LoRA adapter GGUF file
     path: Path,
+    // Custom scaling of the LoRA adapter
     scale: Float = 1.0f
 )
 
@@ -27,30 +31,45 @@ object AdapterParams:
     else Left(ConfigError(s"LoRA adapter file ${params.path} does not exist"))
 
 final case class ModelParams(
+    // Number of layers to store in VRAM
     gpuLayers: Int = -1,
+    // GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
     mainGpu: Int = 0,
+    // Use mmap if possible
     mmap: Boolean = true,
+    // Force system to keep model in RAM
     mlock: Boolean = false,
+    // Attempt optimizations on some NUMA systems
     numa: NumaStrategy = NumaStrategy.DISABLED
 )
 
 final case class RopeParams(
     scalingType: RopeScalingType = RopeScalingType.UNSPECIFIED,
+    // RoPE base frequency, used by NTK-aware scaling
     freqBase: Float = 0.0f,
+    // RoPE frequency scaling factor, expands context by a factor of 1/N
     freqScale: Float = 0.0f
 )
 
 final case class YarnParams(
+    // Extrapolation mix factor
     extFactor: Float = -1.0f,
+    // Magnitude scaling factor
     attnFactor: Float = 1.0f,
+    // Low correction dim
     betaFast: Float = 32.0f,
+    // High correction dim
     betaSlow: Float = 1.0f,
+    // Original context size
     origCtx: Int = 0
 )
 
 final case class BatchParams(
+    // Logical maximum batch size
     logical: Int = 2048,
+    // Physical maximum batch size
     physical: Int = 512,
+    // Number of threads to use for batch processing
     threads: Int = Default.threads
 )
 
@@ -75,11 +94,14 @@ object GroupAttention:
     else Right(params)
 
 final case class ContextParams(
+    // Context size
     size: Int = 4096,
+    // Number of threads to use for generation
     threads: Int = Default.threads,
     batch: BatchParams = BatchParams(),
     rope: RopeParams = RopeParams(),
     yarn: YarnParams = YarnParams(),
+    // Whether to use flash attention
     flashAttention: Boolean = false
 )
 
@@ -97,17 +119,26 @@ object ContextParams:
     yield config
 
 final case class Penalty(
+    // Last n tokens to penalize
     lastN: Int = 64,
+    // Penalize repeat sequence of tokens
     repeat: Float = 1.0f,
+    // Repeat alpha frequency penalty
     frequency: Float = .0f,
+    // Repeat alpha presence penalty
     presence: Float = .0f
 )
 
 final case class Dry(
+    // DRY repetition penalty for tokens extending repetition
     multiplier: Float = .0f,
+    // multiplier * base ^ (length of sequence before token - allowed length)
     base: Float = 1.75f,
+    // Tokens extending repetitions beyond this receive penalty
     allowedLength: Int = 2,
+    // How many tokens to scan for repetitions
     penaltyLastN: Int = -1,
+    // Sequence breakers
     seqBreakers: Seq[Char] = Seq[Char]('\n', ':', '"', '*')
 )
 
@@ -118,6 +149,7 @@ final case class Xtc(
 
 final case class Dynatemp(
     range: Float = .0f,
+    // Controls how entropy maps to temperature in dynamic temperature sampler
     exponent: Float = 1.0f
 )
 
@@ -126,12 +158,15 @@ enum SamplerType:
 
 enum Sampling:
   case Dist(
+      // Whether to use greedy sampler
       greedy: Boolean = false,
+      // List of samplers to apply (order is important)
       samplers: List[SamplerType] = SamplerType.values.toList,
       seed: Int = Default.seed,
       logitBias: Map[Int, Float] = Map(),
       penalty: Penalty = Penalty(),
       dry: Dry = Dry(),
+      // Minimum number of tokens for samplers to to return
       minKeep: Short = 0,
       topK: Int = 40,
       typicalP: Float = 1.0f,
@@ -145,15 +180,20 @@ enum Sampling:
   case Mirostat1(
       seed: Int = Default.seed,
       temp: Float = Default.temp,
+      // Target entropy
       tau: Float = Default.Mirostat.tau,
+      // Learning rate
       eta: Float = Default.Mirostat.eta,
+      // Maximum cross-entropy
       m: Int = 100
   )
 
   case Mirostat2(
       seed: Int = Default.seed,
       temp: Float = Default.temp,
+      // Target entropy
       tau: Float = Default.Mirostat.tau,
+      // Learning rate
       eta: Float = Default.Mirostat.eta
   )
 
@@ -165,6 +205,7 @@ enum Norm:
 
 final case class EmbeddingParams(
     context: ContextParams = ContextParams(),
+    // Normalisation for embeddings
     norm: Option[Norm] = None
 )
 
@@ -176,12 +217,18 @@ object EmbeddingParams:
 final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: Sampling = Sampling.Dist(),
+    // Number of tokens to predict
     predictTokens: Option[Int] = None,
+    // Number of tokens to keep from the initial prompt
     keepTokens: Int = 0,
+    // Optional suffix appended to generated text
     suffix: Option[String] = None,
+    // Whether to return prompt
     echo: Boolean = true,
+    // List of stop sequences
     stopSeqs: List[String] = Nil,
     groupAttention: GroupAttention = GroupAttention(),
+    // List of LoRA adapters
     lora: List[AdapterParams] = Nil
 )
 
