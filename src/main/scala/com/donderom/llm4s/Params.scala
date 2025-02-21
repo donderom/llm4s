@@ -6,9 +6,8 @@ import LlmError.ConfigError
 import Llama.{NumaStrategy, RopeScalingType}
 
 object Default:
-  val threads = Runtime.getRuntime.availableProcessors
+  lazy val threads = Runtime.getRuntime.availableProcessors
 
-  val logprobs: Int = 0
   val seed: Int = 0xfffffff
   val temp: Float = .8f
 
@@ -25,10 +24,15 @@ final case class AdapterParams(
     scale: Float = 1.0f
 )
 
-object AdapterParams:
+trait Validation[A]:
+  extension (s: String) def left: Result[A] = Left(ConfigError(s))
+
+  def parse(params: A): Result[A]
+
+object AdapterParams extends Validation[AdapterParams]:
   def parse(params: AdapterParams): Result[AdapterParams] =
     if Files.exists(params.path) then Right(params)
-    else Left(ConfigError(s"LoRA adapter file ${params.path} does not exist"))
+    else s"LoRA adapter file ${params.path} does not exist".left
 
 final case class ModelParams(
     // Number of layers to store in VRAM
@@ -73,24 +77,20 @@ final case class BatchParams(
     threads: Int = Default.threads
 )
 
-object BatchParams:
+object BatchParams extends Validation[BatchParams]:
   def parse(params: BatchParams): Result[BatchParams] =
-    if params.logical < 1 then
-      Left(ConfigError("Logical batch size should be positive"))
-    else if params.physical < 1 then
-      Left(ConfigError("Batch size should be positive"))
-    else if params.threads < 1 then
-      Left(ConfigError("Batch threads should be positive"))
+    if params.logical < 1 then "Logical batch size should be positive".left
+    else if params.physical < 1 then "Batch size should be positive".left
+    else if params.threads < 1 then "Batch threads should be positive".left
     else Right(params)
 
 final case class GroupAttention(factor: Int = 1, width: Int = 512)
 
-object GroupAttention:
+object GroupAttention extends Validation[GroupAttention]:
   def parse(params: GroupAttention): Result[GroupAttention] =
-    if params.factor <= 0 then
-      Left(ConfigError("Group attention factor should be positive"))
+    if params.factor <= 0 then "Group attention factor should be positive".left
     else if params.width % params.factor != 0 then
-      Left(ConfigError("Group attention width should be a multiple of factor"))
+      "Group attention width should be a multiple of factor".left
     else Right(params)
 
 final case class ContextParams(
@@ -105,50 +105,48 @@ final case class ContextParams(
     flashAttention: Boolean = false
 )
 
-object ContextParams:
+object ContextParams extends Validation[ContextParams]:
   def parse(params: ContextParams): Result[ContextParams] =
     val config =
-      if params.size < 0 then
-        Left(ConfigError("Context size should be positive"))
-      else if params.threads < 1 then
-        Left(ConfigError("Context threads should be positive"))
+      if params.size < 0 then "Context size should be positive".left
+      else if params.threads < 1 then "Context threads should be positive".left
       else Right(params)
     for
       _ <- BatchParams.parse(params.batch)
-      config <- config
-    yield config
+      _ <- config
+    yield params
 
 final case class Penalty(
     // Last n tokens to penalize
-    lastN: Int = 64,
+    lastN: Option[Int] = Some(64),
     // Penalize repeat sequence of tokens
-    repeat: Float = 1.0f,
+    repeat: Option[Float] = None,
     // Repeat alpha frequency penalty
-    frequency: Float = .0f,
+    frequency: Option[Float] = None,
     // Repeat alpha presence penalty
-    presence: Float = .0f
+    presence: Option[Float] = None
 )
 
 final case class Dry(
     // DRY repetition penalty for tokens extending repetition
-    multiplier: Float = .0f,
+    multiplier: Option[Float] = None,
     // multiplier * base ^ (length of sequence before token - allowed length)
-    base: Float = 1.75f,
+    base: Option[Float] = Some(1.75f),
     // Tokens extending repetitions beyond this receive penalty
     allowedLength: Int = 2,
     // How many tokens to scan for repetitions
-    penaltyLastN: Int = -1,
+    penaltyLastN: Option[Int] = Some(-1),
     // Sequence breakers
     seqBreakers: Seq[Char] = Seq[Char]('\n', ':', '"', '*')
 )
 
 final case class Xtc(
-    probability: Float = .0f,
-    threshold: Float = 0.10f
+    probability: Option[Float] = None,
+    threshold: Option[Float] = Some(0.10f)
 )
 
 final case class Dynatemp(
-    range: Float = .0f,
+    range: Option[Float] = None,
     // Controls how entropy maps to temperature in dynamic temperature sampler
     exponent: Float = 1.0f
 )
@@ -167,11 +165,11 @@ enum Sampling:
       penalty: Penalty = Penalty(),
       dry: Dry = Dry(),
       // Minimum number of tokens for samplers to to return
-      minKeep: Short = 0,
-      topK: Int = 40,
-      typicalP: Float = 1.0f,
-      topP: Float = 0.95f,
-      minP: Float = 0.05f,
+      minKeep: Option[Short] = None,
+      topK: Option[Int] = Some(40),
+      typicalP: Option[Float] = None,
+      topP: Option[Float] = Some(0.95f),
+      minP: Option[Float] = Some(0.05f),
       xtc: Xtc = Xtc(),
       temp: Float = Default.temp,
       dynatemp: Dynatemp = Dynatemp()
@@ -196,6 +194,21 @@ enum Sampling:
       // Learning rate
       eta: Float = Default.Mirostat.eta
   )
+
+object Sampling extends Validation[Sampling]:
+  def parse(params: Sampling): Result[Sampling] =
+    params match
+      case dist: Sampling.Dist =>
+        if dist.minKeep.fold(false)(_ <= 0) then
+          "MinKeep should be positive".left
+        else if dist.topK.fold(false)(_ <= 0) then
+          "Top-K should be positive".left
+        else if dist.dry.penaltyLastN.fold(false)(_ < -1) then
+          "Dry penalty last n cannot be negative".left
+        else if dist.penalty.lastN.fold(false)(_ < -1) then
+          "Penalty last n cannot be negative".left
+        else Right(params)
+      case _: Mirostat1 | _: Mirostat2 => Right(params)
 
 enum Norm:
   case MaxAbsolute
@@ -241,5 +254,6 @@ object LlmParams:
         ConfigError("Number of tokens to predict cannot be negative")
       )
       _ <- ContextParams.parse(params.context)
+      _ <- Sampling.parse(params.sampling)
       _ <- GroupAttention.parse(params.groupAttention)
     yield params

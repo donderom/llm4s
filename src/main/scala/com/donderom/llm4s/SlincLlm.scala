@@ -287,7 +287,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
             )
 
           for sampler <- config.samplers do
-            val minKeep = SizeT(config.minKeep)
+            val minKeep = SizeT(config.minKeep.getOrElse(0))
             sampler match
               case SamplerType.DRY =>
                 val seqBreakers = config.dry.seqBreakers.map(_.toByte)
@@ -295,29 +295,39 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                   llama.llama_sampler_init_dry(
                     llama.llama_model_get_vocab(model),
                     llama.llama_model_n_ctx_train(model),
-                    config.dry.multiplier,
-                    config.dry.base,
+                    config.dry.multiplier.getOrElse(.0f),
+                    config.dry.base.getOrElse(.0f),
                     config.dry.allowedLength,
-                    config.dry.penaltyLastN,
+                    config.dry.penaltyLastN.getOrElse(0),
                     Ptr.copy(Ptr.copy(seqBreakers.toArray)),
                     SizeT(seqBreakers.size.toShort)
                   )
                 )
 
               case SamplerType.TOP_K =>
-                add(llama.llama_sampler_init_top_k(config.topK))
+                add(llama.llama_sampler_init_top_k(config.topK.getOrElse(0)))
 
               case SamplerType.TOP_P =>
-                add(llama.llama_sampler_init_top_p(config.topP, minKeep))
+                add(
+                  llama.llama_sampler_init_top_p(
+                    config.topP.getOrElse(1.0f),
+                    minKeep
+                  )
+                )
 
               case SamplerType.MIN_P =>
-                add(llama.llama_sampler_init_min_p(config.minP, minKeep))
+                add(
+                  llama.llama_sampler_init_min_p(
+                    config.minP.getOrElse(.0f),
+                    minKeep
+                  )
+                )
 
               case SamplerType.XTC =>
                 add(
                   llama.llama_sampler_init_xtc(
-                    config.xtc.probability,
-                    config.xtc.threshold,
+                    config.xtc.probability.getOrElse(.0f),
+                    config.xtc.threshold.getOrElse(.5f),
                     minKeep,
                     config.seed
                   )
@@ -326,7 +336,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
               case SamplerType.TYPICAL_P =>
                 add(
                   llama.llama_sampler_init_typical(
-                    config.typicalP,
+                    config.typicalP.getOrElse(1.0f),
                     minKeep
                   )
                 )
@@ -335,7 +345,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                 add(
                   llama.llama_sampler_init_temp_ext(
                     config.temp,
-                    config.dynatemp.range,
+                    config.dynatemp.range.getOrElse(.0f),
                     config.dynatemp.exponent
                   )
                 )
@@ -343,10 +353,10 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
               case SamplerType.PENALTIES =>
                 add(
                   llama.llama_sampler_init_penalties(
-                    config.penalty.lastN,
-                    config.penalty.repeat,
-                    config.penalty.frequency,
-                    config.penalty.presence
+                    config.penalty.lastN.getOrElse(0),
+                    config.penalty.repeat.getOrElse(1.0f),
+                    config.penalty.frequency.getOrElse(.0f),
+                    config.penalty.presence.getOrElse(.0f)
                   )
                 )
 
