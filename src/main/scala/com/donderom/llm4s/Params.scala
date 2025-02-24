@@ -218,6 +218,7 @@ enum Norm:
 
 final case class EmbeddingParams(
     context: ContextParams = ContextParams(),
+    poolingType: Llama.PoolingType = Llama.PoolingType.NONE,
     // Normalisation for embeddings
     norm: Option[Norm] = None
 )

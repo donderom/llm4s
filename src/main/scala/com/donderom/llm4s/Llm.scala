@@ -47,7 +47,7 @@ object Llm:
         for
           llm <- llm
           config <- LlmParams.parse(params)
-          ctx <- createContext(llm, config.context, false)
+          ctx <- createContext(llm, config.context, llamaParams(false))
           _ <- loadLora(llm, ctx, config.lora)
         yield SlincLlm(ctx).generate(prompt, config)
 
@@ -56,9 +56,18 @@ object Llm:
           params: EmbeddingParams
       ): Result[Array[Float]] =
         for
+          _ <- Either.cond(
+            params.poolingType != Llama.PoolingType.RANK,
+            params,
+            LlmError.ConfigError("Rank pooling type is not supported")
+          )
           llm <- llm
           config <- EmbeddingParams.parse(params)
-          ctx <- createContext(llm, config.context, true)
+          ctx <- createContext(
+            llm,
+            config.context,
+            embeddingParams(params.poolingType)
+          )
         yield SlincLlm(ctx).embeddings(prompt, config)
 
       def close(): Unit =
@@ -104,7 +113,10 @@ object Llm:
       private def createContext(
           llm: Llama.Model,
           params: ContextParams,
-          embedding: Boolean
+          nativeParams: (
+              Llama.ContextParams,
+              ContextParams
+          ) => Llama.ContextParams
       ): Result[Llama.Ctx] =
         val error = s"Cannot initialize model context ($params)"
         for
@@ -112,11 +124,8 @@ object Llm:
           ctx <- catchNonFatal(
             llama.llama_init_from_model(
               model = llm,
-              params = llamaParams(
-                llama.llama_context_default_params(),
-                params,
-                embedding
-              )
+              params =
+                nativeParams(llama.llama_context_default_params(), params)
             )
           )(error).filterOrElse(notNull, ModelError(error))
         yield ctx
@@ -156,9 +165,10 @@ object Llm:
         yield ()
 
       private def llamaParams(
-          defaultParams: Llama.ContextParams,
-          params: ContextParams,
           embedding: Boolean
+      )(
+          defaultParams: Llama.ContextParams,
+          params: ContextParams
       ): Llama.ContextParams =
         defaultParams.copy(
           n_ctx = params.size,
@@ -177,6 +187,15 @@ object Llm:
           flash_attn = params.flashAttention,
           embeddings = embedding
         )
+
+      private def embeddingParams(
+          poolingType: Llama.PoolingType
+      )(
+          defaultParams: Llama.ContextParams,
+          params: ContextParams
+      ): Llama.ContextParams =
+        llamaParams(true)(defaultParams, params)
+          .copy(pooling_type = poolingType)
 
   private def catchNonFatal[A](f: => A)(reason: => String): Result[A] =
     try Right(f)

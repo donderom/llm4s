@@ -161,7 +161,10 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     val ids = encode(prompt)
     val _ = evaluate(ids, Evaluated.none, params.context.batch)
     val size = llama.llama_model_n_embd(model)
-    val embeddings = llama.llama_get_embeddings(ctx).asArray(size).unsafeArray
+    val embeddings =
+      if params.poolingType == Llama.PoolingType.NONE then
+        llama.llama_get_embeddings(ctx).asArray(size).unsafeArray
+      else llama.llama_get_embeddings_seq(ctx, 0).asArray(size).unsafeArray
     llama.llama_free(ctx)
 
     def normalized(
