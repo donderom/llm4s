@@ -2,7 +2,7 @@ val scala3Version = "3.3.0"
 
 ThisBuild / scalaVersion := scala3Version
 ThisBuild / organization := "com.donderom"
-ThisBuild / version := "0.11.0"
+ThisBuild / version := "0.12.0-b4599"
 ThisBuild / versionScheme := Some("early-semver")
 
 lazy val root = project
