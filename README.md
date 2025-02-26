@@ -9,7 +9,7 @@
 Add `llm4s` to your `build.sbt`:
 
 ```scala
-libraryDependencies += "com.donderom" %% "llm4s" % "0.11.0"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.12.0-b4599"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
