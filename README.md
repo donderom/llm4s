@@ -2,7 +2,7 @@
 
 ![Sonatype Nexus (Releases)](https://img.shields.io/nexus/r/com.donderom/llm4s_3?server=https%3A%2F%2Fs01.oss.sonatype.org&style=flat&color=dbf1ff)
 
-*Experimental* Scala 3 bindings for [llama.cpp](https://github.com/ggerganov/llama.cpp) using [Slinc](https://github.com/scala-interop/slinc).
+*Experimental* Scala 3 bindings for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [Slinc](https://github.com/scala-interop/slinc).
 
 ### Setup
 
