@@ -46,11 +46,11 @@ import java.nio.file.Paths
 import com.donderom.llm4s.*
 
 // Path to the llama.cpp shared library
-System.load("llama.cpp/libllama.so")
+System.load("./build/bin/libllama.dylib")
 
 // Path to the model supported by llama.cpp
-val model = Paths.get("models/llama-7b-v2/llama-2-7b.Q4_K_M.gguf")
-val prompt = "Large Language Model is"
+val model = Paths.get("Llama-3.2-3B-Instruct-Q6_K.gguf")
+val prompt = "What is LLM?"
 ```
 
 #### Completion
@@ -78,4 +78,32 @@ llm.embeddings(prompt).foreach: embeddings =>
     print(embd)
     print(' ')
 llm.close()
+```
+
+#### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) example:
+
+`Run.scala`:
+```scala
+//> using scala 3.3.0
+//> using jvm adoptium:17
+//> using java-opt --add-modules=jdk.incubator.foreign
+//> using java-opt --enable-native-access=ALL-UNNAMED
+//> using dep com.donderom::llm4s:0.12.0-b4599
+
+import com.donderom.llm4s.Llm
+import java.nio.file.Paths
+import scala.util.Using
+
+object Main extends App:
+  System.load("./build/bin/libllama.dylib")
+  val model = Paths.get("Llama-3.2-3B-Instruct-Q6_K.gguf")
+  val prompt = "What is LLM?"
+  Using(Llm(model)): llm =>         // llm : com.donderom.llm4s.Llm
+    llm(prompt).foreach: stream =>  // stream : LazyList[String]
+      stream.foreach: token =>      // token : String
+        print(token)
+```
+
+```sh
+scala-cli Run.scala
 ```
