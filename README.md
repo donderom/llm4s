@@ -1,6 +1,8 @@
 ## llm4s
 
-![Sonatype Nexus (Releases)](https://img.shields.io/nexus/r/com.donderom/llm4s_3?server=https%3A%2F%2Fs01.oss.sonatype.org&style=flat&color=dbf1ff)
+[![Maven Central Version](https://img.shields.io/maven-central/v/com.donderom/llm4s_3?style=flat-square&logo=scala&color=dbf1ff)](https://central.sonatype.com/artifact/com.donderom/llm4s_3)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/donderom/llm4s/ci.yml?style=flat-square&color=f1fadf)](https://github.com/donderom/llm4s/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-f2edff?style=flat-square)](https://github.com/donderom/llm4s/blob/main/LICENSE)
 
 *Experimental* Scala 3 bindings for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [Slinc](https://github.com/scala-interop/slinc).
 
