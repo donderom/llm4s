@@ -4,6 +4,10 @@
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/donderom/llm4s/ci.yml?style=flat-square&logo=github&color=f1fadf)](https://github.com/donderom/llm4s/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-f2edff?style=flat-square)](https://github.com/donderom/llm4s/blob/main/LICENSE)
 
+<p align="center">
+<img src="logo.svg" width="128" alt="llm4s logo">
+</p>
+
 *Experimental* Scala 3 bindings for [llama.cpp](https://github.com/ggml-org/llama.cpp) using [Slinc](https://github.com/scala-interop/slinc).
 
 ### Setup
