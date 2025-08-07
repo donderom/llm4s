@@ -16,6 +16,7 @@ inThisBuild(List(
 val scala3Version = "3.3.0"
 
 ThisBuild / scalaVersion := scala3Version
+ThisBuild / versionScheme := Some("early-semver")
 
 lazy val root = project
   .in(file("."))
