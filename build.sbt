@@ -22,7 +22,13 @@ lazy val root = project
   .settings(
     name := "llm4s",
 
-    scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked", "-Wunused:all"),
+    scalacOptions ++= Seq(
+      "-deprecation",
+      "-feature",
+      "-unchecked",
+      "-Wunused:all",
+      "-Xmax-inlines:64"
+    ),
 
     libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.6.0",
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.16" % "test",

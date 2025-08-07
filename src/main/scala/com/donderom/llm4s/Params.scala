@@ -152,7 +152,8 @@ final case class Dynatemp(
 )
 
 enum SamplerType:
-  case PENALTIES, DRY, TOP_K, TYPICAL_P, TOP_P, MIN_P, XTC, TEMPERATURE
+  case PENALTIES, DRY, TOP_N_SIGMA, TOP_K, TYPICAL_P, TOP_P, MIN_P, XTC,
+    TEMPERATURE
 
 enum Sampling:
   case Dist(
@@ -170,6 +171,7 @@ enum Sampling:
       typicalP: Option[Float] = None,
       topP: Option[Float] = Some(0.95f),
       minP: Option[Float] = Some(0.05f),
+      topNSigma: Option[Float] = None,
       xtc: Xtc = Xtc(),
       temp: Float = Default.temp,
       dynatemp: Dynatemp = Dynatemp()

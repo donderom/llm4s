@@ -14,11 +14,12 @@ object Llama:
   type Model = Ptr[Any]
   type Ctx = Ptr[Any]
   type Sampler = Ptr[Any]
+  type Memory = Ptr[Any]
 
   type LoraAdapter = Ptr[Any]
 
   enum VocabType:
-    case NONE, SPM, BPE, WPM, UGM, RWKV
+    case NONE, SPM, BPE, WPM, UGM, RWKV, PLAMO2
 
   given Transform[VocabType, CInt](VocabType.fromOrdinal, _.ordinal)
 
@@ -103,43 +104,45 @@ object Llama:
     case MOSTLY_BF16 extends Ftype(32)
     case MOSTLY_TQ1_0 extends Ftype(36)
     case MOSTLY_TQ2_0 extends Ftype(37)
+    case MOSTLY_MXFP4_MOE extends Ftype(38)
     case GUESSED extends Ftype(1024)
 
   given Transform[Ftype, CInt](
     _ match
-      case Ftype.ALL_F32.code        => Ftype.ALL_F32
-      case Ftype.MOSTLY_F16.code     => Ftype.MOSTLY_F16
-      case Ftype.MOSTLY_Q4_0.code    => Ftype.MOSTLY_Q4_0
-      case Ftype.MOSTLY_Q4_1.code    => Ftype.MOSTLY_Q4_1
-      case Ftype.MOSTLY_Q8_0.code    => Ftype.MOSTLY_Q8_0
-      case Ftype.MOSTLY_Q5_0.code    => Ftype.MOSTLY_Q5_0
-      case Ftype.MOSTLY_Q5_1.code    => Ftype.MOSTLY_Q5_1
-      case Ftype.MOSTLY_Q2_K.code    => Ftype.MOSTLY_Q2_K
-      case Ftype.MOSTLY_Q3_K_S.code  => Ftype.MOSTLY_Q3_K_S
-      case Ftype.MOSTLY_Q3_K_M.code  => Ftype.MOSTLY_Q3_K_M
-      case Ftype.MOSTLY_Q3_K_L.code  => Ftype.MOSTLY_Q3_K_L
-      case Ftype.MOSTLY_Q4_K_S.code  => Ftype.MOSTLY_Q3_K_S
-      case Ftype.MOSTLY_Q4_K_M.code  => Ftype.MOSTLY_Q4_K_M
-      case Ftype.MOSTLY_Q5_K_S.code  => Ftype.MOSTLY_Q5_K_S
-      case Ftype.MOSTLY_Q5_K_M.code  => Ftype.MOSTLY_Q5_K_M
-      case Ftype.MOSTLY_Q6_K.code    => Ftype.MOSTLY_Q6_K
-      case Ftype.MOSTLY_IQ2_XXS.code => Ftype.MOSTLY_IQ2_XXS
-      case Ftype.MOSTLY_IQ2_XS.code  => Ftype.MOSTLY_IQ2_XS
-      case Ftype.MOSTLY_Q2_K_S.code  => Ftype.MOSTLY_Q2_K_S
-      case Ftype.MOSTLY_IQ3_XS.code  => Ftype.MOSTLY_IQ3_XS
-      case Ftype.MOSTLY_IQ3_XXS.code => Ftype.MOSTLY_IQ3_XXS
-      case Ftype.MOSTLY_IQ1_S.code   => Ftype.MOSTLY_IQ1_S
-      case Ftype.MOSTLY_IQ4_NL.code  => Ftype.MOSTLY_IQ4_NL
-      case Ftype.MOSTLY_IQ3_S.code   => Ftype.MOSTLY_IQ3_S
-      case Ftype.MOSTLY_IQ3_M.code   => Ftype.MOSTLY_IQ3_M
-      case Ftype.MOSTLY_IQ2_S.code   => Ftype.MOSTLY_IQ2_S
-      case Ftype.MOSTLY_IQ2_M.code   => Ftype.MOSTLY_IQ2_M
-      case Ftype.MOSTLY_IQ4_XS.code  => Ftype.MOSTLY_IQ4_XS
-      case Ftype.MOSTLY_IQ1_M.code   => Ftype.MOSTLY_IQ1_M
-      case Ftype.MOSTLY_BF16.code    => Ftype.MOSTLY_BF16
-      case Ftype.MOSTLY_TQ1_0.code   => Ftype.MOSTLY_TQ1_0
-      case Ftype.MOSTLY_TQ2_0.code   => Ftype.MOSTLY_TQ2_0
-      case Ftype.GUESSED.code        => Ftype.GUESSED
+      case Ftype.ALL_F32.code          => Ftype.ALL_F32
+      case Ftype.MOSTLY_F16.code       => Ftype.MOSTLY_F16
+      case Ftype.MOSTLY_Q4_0.code      => Ftype.MOSTLY_Q4_0
+      case Ftype.MOSTLY_Q4_1.code      => Ftype.MOSTLY_Q4_1
+      case Ftype.MOSTLY_Q8_0.code      => Ftype.MOSTLY_Q8_0
+      case Ftype.MOSTLY_Q5_0.code      => Ftype.MOSTLY_Q5_0
+      case Ftype.MOSTLY_Q5_1.code      => Ftype.MOSTLY_Q5_1
+      case Ftype.MOSTLY_Q2_K.code      => Ftype.MOSTLY_Q2_K
+      case Ftype.MOSTLY_Q3_K_S.code    => Ftype.MOSTLY_Q3_K_S
+      case Ftype.MOSTLY_Q3_K_M.code    => Ftype.MOSTLY_Q3_K_M
+      case Ftype.MOSTLY_Q3_K_L.code    => Ftype.MOSTLY_Q3_K_L
+      case Ftype.MOSTLY_Q4_K_S.code    => Ftype.MOSTLY_Q3_K_S
+      case Ftype.MOSTLY_Q4_K_M.code    => Ftype.MOSTLY_Q4_K_M
+      case Ftype.MOSTLY_Q5_K_S.code    => Ftype.MOSTLY_Q5_K_S
+      case Ftype.MOSTLY_Q5_K_M.code    => Ftype.MOSTLY_Q5_K_M
+      case Ftype.MOSTLY_Q6_K.code      => Ftype.MOSTLY_Q6_K
+      case Ftype.MOSTLY_IQ2_XXS.code   => Ftype.MOSTLY_IQ2_XXS
+      case Ftype.MOSTLY_IQ2_XS.code    => Ftype.MOSTLY_IQ2_XS
+      case Ftype.MOSTLY_Q2_K_S.code    => Ftype.MOSTLY_Q2_K_S
+      case Ftype.MOSTLY_IQ3_XS.code    => Ftype.MOSTLY_IQ3_XS
+      case Ftype.MOSTLY_IQ3_XXS.code   => Ftype.MOSTLY_IQ3_XXS
+      case Ftype.MOSTLY_IQ1_S.code     => Ftype.MOSTLY_IQ1_S
+      case Ftype.MOSTLY_IQ4_NL.code    => Ftype.MOSTLY_IQ4_NL
+      case Ftype.MOSTLY_IQ3_S.code     => Ftype.MOSTLY_IQ3_S
+      case Ftype.MOSTLY_IQ3_M.code     => Ftype.MOSTLY_IQ3_M
+      case Ftype.MOSTLY_IQ2_S.code     => Ftype.MOSTLY_IQ2_S
+      case Ftype.MOSTLY_IQ2_M.code     => Ftype.MOSTLY_IQ2_M
+      case Ftype.MOSTLY_IQ4_XS.code    => Ftype.MOSTLY_IQ4_XS
+      case Ftype.MOSTLY_IQ1_M.code     => Ftype.MOSTLY_IQ1_M
+      case Ftype.MOSTLY_BF16.code      => Ftype.MOSTLY_BF16
+      case Ftype.MOSTLY_TQ1_0.code     => Ftype.MOSTLY_TQ1_0
+      case Ftype.MOSTLY_TQ2_0.code     => Ftype.MOSTLY_TQ2_0
+      case Ftype.MOSTLY_MXFP4_MOE.code => Ftype.MOSTLY_MXFP4_MOE
+      case Ftype.GUESSED.code          => Ftype.GUESSED
     ,
     _.code
   )
@@ -205,12 +208,28 @@ object Llama:
   final case class TokenData(id: Token, logit: CFloat, p: CFloat) derives Struct
 
   final case class TokenDataArray(
+      // NOTE: this pointer can be modified by the samplers
       data: Ptr[TokenData],
       size: SizeT,
-      selected: CInt,
+      selected: CInt, // this is the index in the data array (i.e. not the token id)
       sorted: CBool
   ) derives Struct
 
+  // Input data for llama_encode/llama_decode
+  // A llama_batch object can contain input about one or many sequences
+  // The provided arrays (i.e. token, embd, pos, etc.) must have size of n_tokens
+  //
+  // - token  : the token ids of the input (used when embd is NULL)
+  // - embd   : token embeddings (i.e. float vector of size n_embd) (used when token is NULL)
+  // - pos    : the positions of the respective token in the sequence
+  //            (if set to NULL, the token position will be tracked automatically by llama_encode/llama_decode)
+  // - seq_id : the sequence to which the respective token belongs
+  //            (if set to NULL, the sequence ID will be assumed to be 0)
+  // - logits : if zero, the logits (and/or the embeddings) for the respective token will not be output
+  //            (if set to NULL:
+  //               - if embeddings: all tokens are output
+  //               - if not:        only the last token is output
+  //            )
   final case class Batch(
       n_tokens: CInt,
       token: Ptr[Token],
@@ -236,19 +255,35 @@ object Llama:
   ) derives Struct
 
   final case class ModelParams(
+      // NULL-terminated list of devices to use for offloading (if NULL, all available devices are used)
       devices: Ptr[Any],
+
+      // NULL-terminated list of buffer types to use for tensors that match a pattern
+      tensor_buft_overrides: Ptr[Any],
+
+      // number of layers to store in VRAM
       n_gpu_layers: CInt,
-      split_mode: SplitMode,
+      split_mode: SplitMode, // how to split the model across multiple GPUs
+
+      // the GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
       main_gpu: CInt,
+
+      // proportion of the model (layers or rows) to offload to each GPU, size: llama_max_devices()
       tensor_split: Ptr[CFloat],
+
       // Callbacks are not supported yet
       progress_callback: Ptr[(CFloat, Any) => CBool],
       progress_callback_user_data: Ptr[Unit],
+
+      // override key-value pairs of the model meta data
       kv_overrides: Ptr[ModelKvOverride],
-      vocab_only: CBool,
-      use_mmap: CBool,
-      use_mlock: CBool,
-      check_tensors: CBool
+
+      // Booleans
+      vocab_only: CBool, // only load the vocabulary, no weights
+      use_mmap: CBool, // use mmap if possible
+      use_mlock: CBool, // force system to keep model in RAM
+      check_tensors: CBool, // validate model tensor data
+      use_extra_bufts: CBool // use extra buffer types (used for weight repacking)
   ) derives Struct
 
   enum GgmlType(val code: CInt):
@@ -283,7 +318,8 @@ object Llama:
     case BF16 extends GgmlType(30)
     case TQ1_0 extends GgmlType(34)
     case TQ2_0 extends GgmlType(35)
-    case COUNT extends GgmlType(39)
+    case MXFP4 extends GgmlType(39)
+    case COUNT extends GgmlType(40)
 
   given Transform[GgmlType, CInt](
     _ match
@@ -318,56 +354,77 @@ object Llama:
       case GgmlType.BF16.code    => GgmlType.BF16
       case GgmlType.TQ1_0.code   => GgmlType.TQ1_0
       case GgmlType.TQ2_0.code   => GgmlType.TQ2_0
+      case GgmlType.MXFP4.code   => GgmlType.MXFP4
       case GgmlType.COUNT.code   => GgmlType.COUNT
     ,
     _.code
   )
 
   final case class ContextParams(
-      n_ctx: CInt,
-      n_batch: CInt,
-      n_ubatch: CInt,
-      n_seq_max: CInt,
-      n_threads: CInt,
-      n_threads_batch: CInt,
-      rope_scaling_type: RopeScalingType,
-      pooling_type: PoolingType,
-      attention_type: AttentionType,
-      rope_freq_base: CFloat,
-      rope_freq_scale: CFloat,
-      yarn_ext_factor: CFloat,
-      yarn_attn_factor: CFloat,
-      yarn_beta_fast: CFloat,
-      yarn_beta_slow: CFloat,
-      yarn_orig_ctx: CInt,
-      defrag_thold: CFloat,
+      n_ctx: CInt, // text context, 0 = from model
+      n_batch: CInt, // logical maximum batch size that can be submitted to llama_decode
+      n_ubatch: CInt, // physical maximum batch size
+      n_seq_max: CInt, // max number of sequences (i.e. distinct states for recurrent models)
+      n_threads: CInt, // number of threads to use for generation
+      n_threads_batch: CInt, // number of threads to use for batch processing
+
+      rope_scaling_type: RopeScalingType, // RoPE scaling type, from `enum llama_rope_scaling_type`
+      pooling_type: PoolingType, // whether to pool (sum) embedding results by sequence id
+      attention_type: AttentionType, // attention type to use for embeddings
+
+      rope_freq_base: CFloat, // RoPE base frequency, 0 = from model
+      rope_freq_scale: CFloat, // RoPE frequency scaling factor, 0 = from model
+      yarn_ext_factor: CFloat, // YaRN extrapolation mix factor, negative = from model
+      yarn_attn_factor: CFloat, // YaRN magnitude scaling factor
+      yarn_beta_fast: CFloat, // YaRN low correction dim
+      yarn_beta_slow: CFloat, // YaRN high correction dim
+      yarn_orig_ctx: CInt, // YaRN original context size
+      defrag_thold: CFloat, // defragment the KV cache if holes/size > thold, <= 0 disabled (default)
+
       // Callbacks are not supported yet
       cb_eval: Ptr[Any],
       cb_eval_user_data: Ptr[Any],
+
+      // data type for KV cache [EXPERIMENTAL]
       type_k: GgmlType,
       type_v: GgmlType,
-      logits_all: CBool,
-      embeddings: CBool,
-      offload_kqv: CBool,
-      flash_attn: CBool,
-      no_perf: CBool,
+
       // Callbacks are not supported yet
       abort_callback: Ptr[Any],
-      abort_callback_data: Ptr[Any]
+      abort_callback_data: Ptr[Any],
+
+      // Booleans
+      embeddings: CBool, // if true, extract embeddings (together with logits)
+      offload_kqv: CBool, // offload the KQV ops (including the KV cache) to GPU
+      flash_attn: CBool, // use flash attention [EXPERIMENTAL]
+      no_perf: CBool, // measure performance timings
+      op_offload: CBool, // offload host tensor operations to device
+      // use full-size SWA cache (https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+      // NOTE: setting to false when n_seq_max > 1 can cause bad performance in some cases
+      //       ref: https://github.com/ggml-org/llama.cpp/pull/13845#issuecomment-2924800573
+      swa_full: CBool,
+      // use a unified buffer across the input sequences when computing the attention
+      // try to disable when n_seq_max > 1 for improved performance when the sequences do not share a large prefix
+      // ref: https://github.com/ggml-org/llama.cpp/pull/14363
+      kv_unified: CBool
   ) derives Struct
 
   final case class ModelQuantizeParams(
-      nthread: CInt,
-      ftype: Ftype,
-      output_tensor_type: GgmlType,
-      token_embedding_type: GgmlType,
-      allow_requantize: CBool,
-      quantize_output_tensor: CBool,
-      only_copy: CBool,
-      pure: CBool,
-      keep_split: CBool,
-      imatrix: Ptr[Any],
-      kv_overrides: Ptr[Any]
+      nthread: CInt, // number of threads to use for quantizing, if <=0 will use std::thread::hardware_concurrency()
+      ftype: Ftype, // quantize to this llama_ftype
+      output_tensor_type: GgmlType, // output tensor type
+      token_embedding_type: GgmlType, // token embeddings tensor type
+      allow_requantize: CBool, // allow quantizing non-f32/f16 tensors
+      quantize_output_tensor: CBool, // quantize output.weight
+      only_copy: CBool, // only copy tensors - ftype, allow_requantize and quantize_output_tensor are ignored
+      pure: CBool, // quantize all tensors to the default type
+      keep_split: CBool, // quantize to the same number of shards
+      imatrix: Ptr[Any], // pointer to importance matrix data
+      kv_overrides: Ptr[Any], // pointer to vector containing overrides
+      tensor_types: Ptr[Any], // pointer to vector containing tensor types
+      prune_layers: Ptr[
+        Any
+      ] // pointer to vector containing layer indices to prune
   ) derives Struct
 
   enum NumaStrategy:
@@ -416,6 +473,8 @@ trait Llama derives FSet:
       params: ModelParams
   ): Model
 
+  def llama_model_save_to_file(model: Model, path_model: Ptr[CChar]): Unit
+
   def llama_model_free(model: Model): Unit
 
   def llama_init_from_model(model: Model, params: ContextParams): Ctx
@@ -426,6 +485,7 @@ trait Llama derives FSet:
   def llama_time_us(): CInt
 
   def llama_max_devices(): SizeT
+  def llama_max_parallel_sequences(): SizeT
 
   def llama_supports_mmap(): CBool
   def llama_supports_mlock(): CBool
@@ -438,6 +498,7 @@ trait Llama derives FSet:
   def llama_n_seq_max(ctx: Ctx): CInt
 
   def llama_get_model(ctx: Ctx): Model
+  def llama_get_memory(ctx: Ctx): Memory
   def llama_pooling_type(ctx: Ctx): PoolingType
 
   def llama_model_get_vocab(model: Model): Vocab
@@ -447,9 +508,18 @@ trait Llama derives FSet:
   def llama_model_n_embd(model: Model): CInt
   def llama_model_n_layer(model: Model): CInt
   def llama_model_n_head(model: Model): CInt
+  def llama_model_n_head_kv(model: Model): CInt
+  def llama_model_n_swa(model: Model): CInt
 
   // Get the model's RoPE frequency scaling factor
   def llama_model_rope_freq_scale_train(model: Model): CFloat
+
+  // Returns the number of classifier outputs (only valid for classifier models)
+  // Undefined behavior for non-classifier models
+  def llama_model_n_cls_out(model: Model): CInt
+
+  // Returns label of classifier output by index (<n_cls_out). Returns nullptr if no label provided
+  def llama_model_cls_label(model: Model, i: CInt): Ptr[CChar]
 
   def llama_vocab_type(vocab: Vocab): VocabType
 
@@ -508,6 +578,9 @@ trait Llama derives FSet:
   // Returns true if the model is recurrent (like Mamba, RWKV, etc.)
   def llama_model_is_recurrent(model: Model): CBool
 
+  // Returns true if the model is diffusion-based (like LLaDA, Dream, etc.)
+  def llama_model_is_diffusion(model: Model): CBool
+
   // Returns 0 on success
   def llama_model_quantize(
       fname_inp: Ptr[CChar],
@@ -515,7 +588,9 @@ trait Llama derives FSet:
       params: Ptr[ModelQuantizeParams]
   ): CInt
 
+  //
   // Adapters
+  //
 
   // Load a LoRA adapter from file
   def llama_adapter_lora_init(model: Model, path_lora: Ptr[CChar]): LoraAdapter
@@ -550,31 +625,26 @@ trait Llama derives FSet:
       il_end: CInt
   ): CInt
 
-  // KV cache
+  //
+  // Memory
+  //
 
-  // Returns the number of tokens in the KV cache (slow, use only for debug)
-  // If a KV cell has multiple sequences assigned to it, it will be counted multiple times
-  def llama_get_kv_cache_token_count(ctx: Ctx): CInt
-
-  // Returns the number of used KV cells (i.e. have at least one sequence assigned to them)
-  def llama_get_kv_cache_used_cells(ctx: Ctx): CInt
-
-  // Clear the KV cache - both cell info is erased and KV data is zeroed
-  def llama_kv_cache_clear(ctx: Ctx): Unit
+  // Clear the memory contents
+  // If data == true, the data buffers will also be cleared together with the metadata
+  def llama_memory_clear(mem: Memory, data: CBool): Unit
 
   // Removes all tokens that belong to the specified sequence and have positions in [p0, p1)
   // Returns false if a partial sequence cannot be removed. Removing a whole sequence never fails
   // seq_id < 0 : match any sequence
   // p0 < 0     : [0,  p1]
   // p1 < 0     : [p0, inf)
-  def llama_kv_cache_seq_rm(ctx: Ctx, seq_id: SeqId, p0: Pos, p1: Pos): CBool
+  def llama_memory_seq_rm(mem: Memory, seq_id: SeqId, p0: Pos, p1: Pos): CBool
 
   // Copy all tokens that belong to the specified sequence to another sequence
-  // Note that this does not allocate extra KV cache memory - it simply assigns the tokens to the new sequence
   // p0 < 0 : [0,  p1]
   // p1 < 0 : [p0, inf)
-  def llama_kv_cache_seq_cp(
-      ctx: Ctx,
+  def llama_memory_seq_cp(
+      mem: Memory,
       seq_id_src: SeqId,
       seq_id_dst: SeqId,
       p0: Pos,
@@ -582,16 +652,13 @@ trait Llama derives FSet:
   ): Unit
 
   // Removes all tokens that do not belong to the specified sequence
-  def llama_kv_cache_seq_keep(ctx: Ctx, seq_id: SeqId): Unit
+  def llama_memory_seq_keep(ctx: Ctx, seq_id: SeqId): Unit
 
   // Adds relative position "delta" to all tokens that belong to the specified sequence and have positions in [p0, p1)
-  // If the KV cache is RoPEd, the KV data is updated accordingly:
-  //   - lazily on next llama_decode()
-  //   - explicitly with llama_kv_cache_update()
   // p0 < 0 : [0,  p1]
   // p1 < 0 : [p0, inf)
-  def llama_kv_cache_seq_add(
-      ctx: Ctx,
+  def llama_memory_seq_add(
+      mem: Memory,
       seq_id: SeqId,
       p0: Pos,
       p1: Pos,
@@ -599,35 +666,33 @@ trait Llama derives FSet:
   ): Unit
 
   // Integer division of the positions by factor of `d > 1`
-  // If the KV cache is RoPEd, the KV data is updated accordingly:
-  //   - lazily on next llama_decode()
-  //   - explicitly with llama_kv_cache_update()
   // p0 < 0 : [0,  p1]
   // p1 < 0 : [p0, inf)
-  def llama_kv_cache_seq_div(
-      ctx: Ctx,
+  def llama_memory_seq_div(
+      mem: Memory,
       seq_id: SeqId,
       p0: Pos,
       p1: Pos,
       d: CInt
   ): Unit
 
-  // Returns the largest position present in the KV cache for the specified sequence
-  def llama_kv_cache_seq_pos_max(ctx: Ctx, seq_id: SeqId): Pos
+  // Returns the smallest position present in the memory for the specified sequence
+  // This is typically non-zero only for SWA caches
+  // Note that all positions in the range [pos_min, pos_max] are guaranteed to be present in the memory
+  // Return -1 if the sequence is empty
+  def llama_memory_seq_pos_min(mem: Memory, seq_id: SeqId): Pos
 
-  // Defragment the KV cache
-  // This will be applied:
-  //   - lazily on next llama_decode()
-  //   - explicitly with llama_kv_cache_update()
-  def llama_kv_cache_defrag(ctx: Ctx): Unit
+  // Returns the largest position present in the memory for the specified sequence
+  // Note that all positions in the range [pos_min, pos_max] are guaranteed to be present in the memory
+  // Return -1 if the sequence is empty
+  def llama_memory_seq_pos_max(mem: Memory, seq_id: SeqId): Pos
 
-  // Apply the KV cache updates (such as K-shifts, defragmentation, etc.)
-  def llama_kv_cache_update(ctx: Ctx): Unit
+  // Check if the memory supports shifting
+  def llama_memory_can_shift(mem: Memory): CBool
 
-  // Check if the context supports KV cache shifting
-  def llama_kv_cache_can_shift(ctx: Ctx): CBool
-
+  //
   // Decoding
+  //
 
   // Return batch for single sequence of tokens
   // The sequence ID will be fixed to 0
@@ -648,16 +713,26 @@ trait Llama derives FSet:
   // Frees a batch of tokens allocated with llama_batch_init()
   def llama_batch_free(batch: Batch): Unit
 
-  // Processes a batch of tokens with the ecoder part of the encoder-decoder model.
-  // Stores the encoder output internally for later use by the decoder cross-attention layers.
+  // Process a batch of tokens.
+  // In contrast to llama_decode() - this call does not use KV cache.
+  // For encode-decoder contexts, processes the batch using the encoder.
+  // Can store the encoder output internally for later use by the decoder's cross-attention layers.
   //   0 - success
-  // < 0 - error. the KV cache state is restored to the state before this call
+  // < 0 - error. the memory state is restored to the state before this call
   def llama_encode(ctx: Ctx, batch: Batch): CInt
 
+  // Process a batch of tokens.
+  // Requires the context to have a memory.
+  // For encode-decoder contexts, processes the batch using the decoder.
   // Positive return values does not mean a fatal error, but rather a warning.
-  //   0 - success
-  //   1 - could not find a KV slot for the batch (try reducing the size of the batch or increase the context)
-  // < 0 - error. the KV cache state is restored to the state before this call
+  // Upon fatal-error or abort, the ubatches that managed to be been processed will remain in the memory state of the context
+  //   To handle this correctly, query the memory state using llama_memory_seq_pos_min() and llama_memory_seq_pos_max()
+  // Upon other return values, the memory state is restored to the state before this call
+  //    0 - success
+  //    1 - could not find a KV slot for the batch (try reducing the size of the batch or increase the context)
+  //    2 - aborted     (processed ubatches will remain in the context's memory)
+  //   -1 - invalid input batch
+  // < -1 - fatal error (processed ubatches will remain in the context's memory)
   def llama_decode(ctx: Ctx, batch: Batch): CInt
 
   // Set the number of threads used for decoding
@@ -675,13 +750,16 @@ trait Llama derives FSet:
   // Get the number of threads used for prompt and batch processing (multiple token).
   def llama_n_threads_batch(ctx: Ctx): CInt
 
-  // Set whether the model is in embeddings mode or not
-  // If true, embeddings will be returned but logits will not
+  // Set whether the context outputs embeddings or not
   def llama_set_embeddings(ctx: Ctx, embeddings: CBool): Unit
 
   // Set whether to use causal attention or not
   // If set to true, the model will only attend to the past tokens
   def llama_set_causal_attn(ctx: Ctx, causal_attn: CBool): Unit
+
+  // Set whether the model is in warmup mode or not
+  // If true, all model tensors are activated during llama_decode() to load and cache their weights.
+  def llama_set_warmup(ctx: Ctx, warmup: CBool): Unit
 
   // Set abort callback
   def llama_set_abort_callback(
@@ -725,11 +803,13 @@ trait Llama derives FSet:
 
   // Get the embeddings for a sequence id
   // Returns NULL if pooling_type is LLAMA_POOLING_TYPE_NONE
-  // when pooling_type == LLAMA_POOLING_TYPE_RANK, returns float[1] with the rank of the sequence
+  // when pooling_type == LLAMA_POOLING_TYPE_RANK, returns float[n_cls_out] with the rank(s) of the sequence
   // otherwise: float[n_embd] (1-dimensional)
   def llama_get_embeddings_seq(ctx: Ctx, seq_id: SeqId): Ptr[Float]
 
+  //
   // Vocab
+  //
 
   def llama_vocab_get_text(vocab: Vocab, token: Token): Ptr[CChar]
 
@@ -750,9 +830,11 @@ trait Llama derives FSet:
   def llama_vocab_sep(vocab: Vocab): Token
   def llama_vocab_nl(vocab: Vocab): Token
   def llama_vocab_pad(vocab: Vocab): Token
+  def llama_vocab_mask(vocab: Vocab): Token
 
   def llama_vocab_get_add_bos(vocab: Vocab): CBool
   def llama_vocab_get_add_eos(vocab: Vocab): CBool
+  def llama_vocab_get_add_sep(vocab: Vocab): CBool
 
   def llama_vocab_fim_pre(vocab: Vocab): Token
   def llama_vocab_fim_suf(vocab: Vocab): Token
@@ -761,12 +843,15 @@ trait Llama derives FSet:
   def llama_vocab_fim_rep(vocab: Vocab): Token
   def llama_vocab_fim_sep(vocab: Vocab): Token
 
+  //
   // Tokenization
+  //
 
   /// @details Convert the provided text into tokens.
   /// @param tokens The tokens pointer must be large enough to hold the resulting tokens.
   /// @return Returns the number of tokens on success, no more than n_tokens_max
   /// @return Returns a negative number on failure - the number of tokens that would have been returned
+  /// @return Returns INT32_MIN on overflow (e.g., tokenization result size exceeds int32_t limit)
   /// @param add_special Allow to add BOS and EOS tokens if model is configured to do so.
   /// @param parse_special Allow tokenizing special and/or control tokens which otherwise are not exposed and treated
   ///                      as plaintext. Does not insert a leading space.
@@ -810,11 +895,13 @@ trait Llama derives FSet:
       unparse_special: CBool
   ): CInt
 
+  //
   // Chat templates
+  //
 
   /// Apply chat template. Inspired by hf apply_chat_template() on python.
   /// Both "model" and "custom_template" are optional, but at least one is required. "custom_template" has higher precedence than "model"
-  /// NOTE: This function does not use a jinja parser. It only support a pre-defined list of template. See more: https://github.com/ggerganov/llama.cpp/wiki/Templates-supported-by-llama_chat_apply_template
+  /// NOTE: This function does not use a jinja parser. It only support a pre-defined list of template. See more: https://github.com/ggml-org/llama.cpp/wiki/Templates-supported-by-llama_chat_apply_template
   /// @param tmpl A Jinja template to use for this chat. If this is nullptr, the model’s default chat template will be used instead.
   /// @param chat Pointer to a list of multiple llama_chat_message
   /// @param n_msg Number of llama_chat_message in this chat
@@ -834,8 +921,11 @@ trait Llama derives FSet:
   // Get list of built-in chat templates
   def llama_chat_builtin_templates(output: Ptr[Ptr[CChar]], len: SizeT): CInt
 
+  //
   // Sampling API
+  //
 
+  def llama_sampler_init(iface: Ptr[Any], ctx: Ctx): Sampler
   def llama_sampler_name(sampler: Sampler): Ptr[CChar]
   def llama_sampler_accept(sampler: Sampler, token: Token): Unit
   def llama_sampler_apply(
@@ -863,12 +953,13 @@ trait Llama derives FSet:
   def llama_sampler_init_dist(seed: CInt): Sampler
 
   /// @details Top-K sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
+  /// Setting k <= 0 makes this a noop
   def llama_sampler_init_top_k(k: CInt): Sampler
 
   /// @details Nucleus sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
   def llama_sampler_init_top_p(p: CFloat, min_keep: SizeT): Sampler
 
-  /// @details Minimum P sampling as described in https://github.com/ggerganov/llama.cpp/pull/3841
+  /// @details Minimum P sampling as described in https://github.com/ggml-org/llama.cpp/pull/3841
   def llama_sampler_init_min_p(p: CFloat, min_keep: SizeT): Sampler
 
   /// @details Locally Typical Sampling implementation described in the paper https://arxiv.org/abs/2202.00666.
@@ -891,6 +982,9 @@ trait Llama derives FSet:
       min_keep: SizeT,
       seed: CInt
   ): Sampler
+
+  /// @details Top n sigma sampling as described in academic paper "Top-nσ: Not All Logits Are You Need" https://arxiv.org/pdf/2411.07641
+  def llama_sampler_init_top_n_sigma(n: CFloat): Sampler
 
   /// @details Mirostat 1.0 algorithm described in the paper https://arxiv.org/abs/2007.14966. Uses tokens instead of words.
   /// @param candidates A vector of `llama_token_data` containing the candidate tokens, their probabilities (p), and log-odds (logit) for the current position in the generated text.
@@ -917,21 +1011,25 @@ trait Llama derives FSet:
       eta: CFloat
   ): Sampler
 
+  /// @details Intializes a GBNF grammar, see grammars/README.md for details.
+  /// @param vocab The vocabulary that this grammar will be used with.
+  /// @param grammar_str The production rules for the grammar, encoded as a string. Returns an empty grammar if empty. Returns NULL if parsing of grammar_str fails.
+  /// @param grammar_root The name of the start symbol for the grammar.
   def llama_sampler_init_grammar(
       vocab: Vocab,
       grammar_str: Ptr[CChar],
       grammar_root: Ptr[CChar]
   ): Sampler
 
-  /// @details Lazy grammar sampler, introduced in https://github.com/ggerganov/llama.cpp/pull/9639
-  /// @param trigger_words A list of words that will trigger the grammar sampler. This may be updated to a loose regex syntax (w/ ^) in a near future.
-  /// @param trigger_tokens A list of tokens that will trigger the grammar sampler.
-  def llama_sampler_init_grammar_lazy(
+  /// @details Lazy grammar sampler, introduced in https://github.com/ggml-org/llama.cpp/pull/9639
+  /// @param trigger_patterns A list of patterns that will trigger the grammar sampler. Pattern will be matched from the start of the generation output, and grammar sampler will be fed content starting from its first match group.
+  /// @param trigger_tokens A list of tokens that will trigger the grammar sampler. Grammar sampler will be fed content starting from the trigger token included.
+  def llama_sampler_init_grammar_lazy_patterns(
       vocab: Vocab,
       grammar_str: Ptr[CChar],
       grammar_root: Ptr[CChar],
-      trigger_words: Ptr[Ptr[CChar]],
-      num_trigger_words: SizeT,
+      trigger_patterns: Ptr[Ptr[CChar]],
+      num_trigger_patterns: SizeT,
       trigger_tokens: Ptr[Token],
       num_trigger_tokens: SizeT
   ): Sampler
@@ -999,7 +1097,9 @@ trait Llama derives FSet:
   // Returns the sampled token
   def llama_sampler_sample(smpl: Sampler, ctx: Ctx, idx: CInt): Token
 
+  //
   // Model split
+  //
 
   /// @details Build a split GGUF final path for this chunk.
   ///          llama_split_path(split_path, sizeof(split_path), "/models/ggml-model-q4_0", 2, 4) => split_path = "/models/ggml-model-q4_0-00002-of-00004.gguf"

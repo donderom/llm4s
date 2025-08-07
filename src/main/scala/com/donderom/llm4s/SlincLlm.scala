@@ -18,6 +18,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val llama = FSet.instance[Llama]
 
   lazy val model = llama.llama_get_model(ctx)
+  lazy val mem = llama.llama_get_memory(ctx)
   lazy val decoder = StandardCharsets.UTF_8.newDecoder
 
   def generate(prompt: String, params: LlmParams): Usage =
@@ -35,14 +36,14 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
           if params.groupAttention.factor == 1 then
             val left = evaluated.toInt - keepTokens
             val discard = left / 2
-            llama.llama_kv_cache_seq_rm(
-              ctx = ctx,
+            llama.llama_memory_seq_rm(
+              mem = mem,
               seq_id = 0,
               p0 = keepTokens,
               p1 = keepTokens + discard
             )
-            llama.llama_kv_cache_seq_add(
-              ctx = ctx,
+            llama.llama_memory_seq_add(
+              mem = mem,
               seq_id = 0,
               p0 = keepTokens + discard,
               p1 = evaluated.toInt,
@@ -59,22 +60,22 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                 val ib = (factor * kvTokens) / width
                 val bd = (width / factor) * (factor - 1)
                 val dd = (width / factor) - ib * bd - width
-                llama.llama_kv_cache_seq_add(
-                  ctx = ctx,
+                llama.llama_memory_seq_add(
+                  mem = mem,
                   seq_id = 0,
                   p0 = kvTokens,
                   p1 = past.toInt,
                   delta = ib * bd
                 )
-                llama.llama_kv_cache_seq_div(
-                  ctx = ctx,
+                llama.llama_memory_seq_div(
+                  mem = mem,
                   seq_id = 0,
                   p0 = kvTokens + ib * bd,
                   p1 = kvTokens + ib * bd + width,
                   d = factor
                 )
-                llama.llama_kv_cache_seq_add(
-                  ctx = ctx,
+                llama.llama_memory_seq_add(
+                  mem = mem,
                   seq_id = 0,
                   p0 = kvTokens + ib * bd + width,
                   p1 = past.toInt + ib * bd,
@@ -304,6 +305,13 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                     config.dry.penaltyLastN.getOrElse(0),
                     Ptr.copy(Ptr.copy(seqBreakers.toArray)),
                     SizeT(seqBreakers.size.toShort)
+                  )
+                )
+
+              case SamplerType.TOP_N_SIGMA =>
+                add(
+                  llama.llama_sampler_init_top_n_sigma(
+                    config.topNSigma.getOrElse(-1.0f)
                   )
                 )
 
