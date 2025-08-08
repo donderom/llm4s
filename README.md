@@ -29,7 +29,7 @@ For JDK 17 add `.jvmopts` file in the project root:
 
 * Scala: 3.3.0
 * JDK: 17 or 19
-* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.13.0-b6109` means that it supports the [b4599](https://github.com/ggml-org/llama.cpp/releases/tag/b4599) release).
+* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.13.0-b6109` means that it supports the [b6109](https://github.com/ggml-org/llama.cpp/releases/tag/b6109) release).
 
 <details>
   <summary>Older versions</summary>
