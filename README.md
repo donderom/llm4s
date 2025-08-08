@@ -15,7 +15,7 @@
 Add `llm4s` to your `build.sbt`:
 
 ```scala
-libraryDependencies += "com.donderom" %% "llm4s" % "0.12.0-b4599"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.13.0-b6109"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -29,7 +29,7 @@ For JDK 17 add `.jvmopts` file in the project root:
 
 * Scala: 3.3.0
 * JDK: 17 or 19
-* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.12.0-b4599` means that it supports the [b4599](https://github.com/ggml-org/llama.cpp/releases/tag/b4599) release).
+* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.13.0-b6109` means that it supports the [b4599](https://github.com/ggml-org/llama.cpp/releases/tag/b4599) release).
 
 <details>
   <summary>Older versions</summary>
@@ -94,7 +94,7 @@ llm.close()
 //> using jvm adoptium:17
 //> using java-opt --add-modules=jdk.incubator.foreign
 //> using java-opt --enable-native-access=ALL-UNNAMED
-//> using dep com.donderom::llm4s:0.12.0-b4599
+//> using dep com.donderom::llm4s:0.13.0-b6109
 
 import com.donderom.llm4s.Llm
 import java.nio.file.Paths
