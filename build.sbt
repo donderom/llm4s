@@ -1,3 +1,5 @@
+val scala3Version = "3.3.0"
+
 inThisBuild(List(
   organization := "com.donderom",
   homepage := Some(url("https://github.com/donderom/llm4s")),
@@ -11,12 +13,10 @@ inThisBuild(List(
       url = url("https://donderom.com")
     )
   ),
+  startYear := Some(2023),
+  scalaVersion := scala3Version,
+  versionScheme := Some("early-semver"),
 ))
-
-val scala3Version = "3.3.0"
-
-ThisBuild / scalaVersion := scala3Version
-ThisBuild / versionScheme := Some("early-semver")
 
 lazy val root = project
   .in(file("."))
