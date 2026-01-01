@@ -29,6 +29,7 @@ object Llama:
     case NEOX extends RopeType(2)
     case MROPE extends RopeType(8)
     case VISION extends RopeType(24)
+    case IMROPE extends RopeType(40)
 
   given Transform[RopeType, CInt](
     _ match
@@ -36,6 +37,7 @@ object Llama:
       case RopeType.NORM.code   => RopeType.NORM
       case RopeType.NEOX.code   => RopeType.NEOX
       case RopeType.MROPE.code  => RopeType.MROPE
+      case RopeType.IMROPE.code => RopeType.IMROPE
       case RopeType.VISION.code => RopeType.VISION
     ,
     _.code
@@ -200,6 +202,20 @@ object Llama:
     _.code
   )
 
+  enum FlashAttentionType(val code: CInt):
+    case AUTO extends FlashAttentionType(-1)
+    case DISABLED extends FlashAttentionType(0)
+    case ENABLED extends FlashAttentionType(1)
+
+  given Transform[FlashAttentionType, CInt](
+    _ match
+      case FlashAttentionType.AUTO.code     => FlashAttentionType.AUTO
+      case FlashAttentionType.DISABLED.code => FlashAttentionType.DISABLED
+      case FlashAttentionType.ENABLED.code  => FlashAttentionType.ENABLED
+    ,
+    _.code
+  )
+
   enum SplitMode:
     case NONE, LAYER, ROW
 
@@ -283,7 +299,9 @@ object Llama:
       use_mmap: CBool, // use mmap if possible
       use_mlock: CBool, // force system to keep model in RAM
       check_tensors: CBool, // validate model tensor data
-      use_extra_bufts: CBool // use extra buffer types (used for weight repacking)
+      use_extra_bufts: CBool, // use extra buffer types (used for weight repacking)
+      no_host: CBool, // bypass host buffer allowing extra buffers to be used
+      no_alloc: CBool // only load metadata and simulate memory allocations
   ) derives Struct
 
   enum GgmlType(val code: CInt):
@@ -371,6 +389,7 @@ object Llama:
       rope_scaling_type: RopeScalingType, // RoPE scaling type, from `enum llama_rope_scaling_type`
       pooling_type: PoolingType, // whether to pool (sum) embedding results by sequence id
       attention_type: AttentionType, // attention type to use for embeddings
+      flash_attention_type: FlashAttentionType, // when to enable Flash Attention
 
       rope_freq_base: CFloat, // RoPE base frequency, 0 = from model
       rope_freq_scale: CFloat, // RoPE frequency scaling factor, 0 = from model
@@ -379,7 +398,7 @@ object Llama:
       yarn_beta_fast: CFloat, // YaRN low correction dim
       yarn_beta_slow: CFloat, // YaRN high correction dim
       yarn_orig_ctx: CInt, // YaRN original context size
-      defrag_thold: CFloat, // defragment the KV cache if holes/size > thold, <= 0 disabled (default)
+      defrag_thold: CFloat, // [DEPRECATED] defragment the KV cache if holes/size > thold, <= 0 disabled (default)
 
       // Callbacks are not supported yet
       cb_eval: Ptr[Any],
@@ -396,7 +415,6 @@ object Llama:
       // Booleans
       embeddings: CBool, // if true, extract embeddings (together with logits)
       offload_kqv: CBool, // offload the KQV ops (including the KV cache) to GPU
-      flash_attn: CBool, // use flash attention [EXPERIMENTAL]
       no_perf: CBool, // measure performance timings
       op_offload: CBool, // offload host tensor operations to device
       // use full-size SWA cache (https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)

@@ -3,7 +3,7 @@ package com.donderom.llm4s
 import java.nio.file.{Files, Path}
 
 import LlmError.ConfigError
-import Llama.{NumaStrategy, RopeScalingType}
+import Llama.{FlashAttentionType, NumaStrategy, RopeScalingType}
 
 object Default:
   lazy val threads = Runtime.getRuntime.availableProcessors
@@ -93,6 +93,14 @@ object GroupAttention extends Validation[GroupAttention]:
       "Group attention width should be a multiple of factor".left
     else Right(params)
 
+enum FlashAttention:
+  case Auto, On, Off
+
+  private[llm4s] def asType: FlashAttentionType = this match
+    case Auto => FlashAttentionType.AUTO
+    case On   => FlashAttentionType.ENABLED
+    case Off  => FlashAttentionType.DISABLED
+
 final case class ContextParams(
     // Context size
     size: Int = 4096,
@@ -101,8 +109,7 @@ final case class ContextParams(
     batch: BatchParams = BatchParams(),
     rope: RopeParams = RopeParams(),
     yarn: YarnParams = YarnParams(),
-    // Whether to use flash attention
-    flashAttention: Boolean = false
+    flashAttention: FlashAttention = FlashAttention.Auto
 )
 
 object ContextParams extends Validation[ContextParams]:
