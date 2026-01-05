@@ -270,6 +270,25 @@ object Llama:
       value: CUnion[(CInt, CDouble, CBool, CChar)]
   ) derives Struct
 
+  enum ModelMetaKey:
+    case SAMPLING_SEQUENCE,
+      SAMPLING_TOP_K,
+      SAMPLING_TOP_P,
+      SAMPLING_MIN_P,
+      SAMPLING_XTC_PROBABILITY,
+      SAMPLING_XTC_THRESHOLD,
+      SAMPLING_TEMP,
+      SAMPLING_PENALTY_LAST_N,
+      SAMPLING_PENALTY_REPEAT,
+      SAMPLING_MIROSTAT,
+      SAMPLING_MIROSTAT_TAU,
+      SAMPLING_MIROSTAT_ETA
+
+  given Transform[ModelMetaKey, CInt](
+    ModelMetaKey.fromOrdinal,
+    _.ordinal
+  )
+
   final case class ModelParams(
       // NULL-terminated list of devices to use for offloading (if NULL, all available devices are used)
       devices: Ptr[Any],
@@ -457,6 +476,9 @@ object Llama:
   final case class ChatMessage(role: Ptr[CChar], content: Ptr[CChar])
       derives Struct
 
+  enum FitStatus:
+    case SUCCESS, FAILURE, ERROR
+
 trait Llama derives FSet:
   import Llama.*
 
@@ -504,6 +526,7 @@ trait Llama derives FSet:
 
   def llama_max_devices(): SizeT
   def llama_max_parallel_sequences(): SizeT
+  def llama_max_tensor_buft_overrides(): SizeT
 
   def llama_supports_mmap(): CBool
   def llama_supports_mlock(): CBool
@@ -511,6 +534,7 @@ trait Llama derives FSet:
   def llama_supports_rpc(): CBool
 
   def llama_n_ctx(ctx: Ctx): CInt
+  def llama_n_ctx_seq(ctx: Ctx): CInt
   def llama_n_batch(ctx: Ctx): CInt
   def llama_n_ubatch(ctx: Ctx): CInt
   def llama_n_seq_max(ctx: Ctx): CInt
@@ -524,6 +548,7 @@ trait Llama derives FSet:
 
   def llama_model_n_ctx_train(model: Model): CInt
   def llama_model_n_embd(model: Model): CInt
+  def llama_model_n_embd_inp(model: Model): CInt
   def llama_model_n_layer(model: Model): CInt
   def llama_model_n_head(model: Model): CInt
   def llama_model_n_head_kv(model: Model): CInt
@@ -553,6 +578,9 @@ trait Llama derives FSet:
 
   // Get the number of metadata key/value pairs
   def llama_model_meta_count(model: Model): CInt
+
+  // Get sampling metadata key name. Returns nullptr if the key is invalid
+  def llama_model_meta_key_str(key: ModelMetaKey): Ptr[CChar]
 
   // Get metadata key name by index
   def llama_model_meta_key_by_index(
@@ -596,6 +624,9 @@ trait Llama derives FSet:
   // Returns true if the model is recurrent (like Mamba, RWKV, etc.)
   def llama_model_is_recurrent(model: Model): CBool
 
+  // Returns true if the model is hybrid (like Jamba, Granite, etc.)
+  def llama_model_is_hybrid(model: Model): CBool
+
   // Returns true if the model is diffusion-based (like LLaDA, Dream, etc.)
   def llama_model_is_diffusion(model: Model): CBool
 
@@ -613,9 +644,42 @@ trait Llama derives FSet:
   // Load a LoRA adapter from file
   def llama_adapter_lora_init(model: Model, path_lora: Ptr[CChar]): LoraAdapter
 
+  // Get metadata value as a string by key name
+  def llama_adapter_meta_val_str(
+      adapter: LoraAdapter,
+      key: Ptr[CChar],
+      buf: Ptr[CChar],
+      buf_size: SizeT
+  ): CInt
+
+  // Get the number of metadata key/value pairs
+  def llama_adapter_meta_count(adapter: LoraAdapter): CInt
+
+  // Get metadata key name by index
+  def llama_adapter_meta_key_by_index(
+      adapter: LoraAdapter,
+      i: CInt,
+      buf: Ptr[CChar],
+      buf_size: SizeT
+  ): CInt
+
+  // Get metadata value as a string by index
+  def llama_adapter_meta_val_str_by_index(
+      adapter: LoraAdapter,
+      i: CInt,
+      buf: Ptr[CChar],
+      buf_size: SizeT
+  ): CInt
+
   // Manually free a LoRA adapter
   // Note: loaded adapters will be free when the associated model is deleted
   def llama_adapter_lora_free(adapter: LoraAdapter): Unit
+
+  // Get the invocation tokens if the current lora is an alora
+  def llama_adapter_get_alora_n_invocation_tokens(adapter: LoraAdapter): CInt
+  def llama_adapter_get_alora_invocation_tokens(
+      adapter: LoraAdapter
+  ): Ptr[Token]
 
   // Add a loaded LoRA adapter to given context
   // This will not modify model's weight
@@ -1143,3 +1207,7 @@ trait Llama derives FSet:
 
   // Print system information
   def llama_print_system_info(): Ptr[CChar]
+
+  def llama_flash_attn_type_name(
+      flash_attn_type: FlashAttentionType
+  ): Ptr[CChar]
