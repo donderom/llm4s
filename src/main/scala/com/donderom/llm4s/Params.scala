@@ -59,11 +59,11 @@ final case class YarnParams(
     // Extrapolation mix factor
     extFactor: Float = -1.0f,
     // Magnitude scaling factor
-    attnFactor: Float = 1.0f,
+    attnFactor: Float = -1.0f,
     // Low correction dim
-    betaFast: Float = 32.0f,
+    betaFast: Float = -1.0f,
     // High correction dim
-    betaSlow: Float = 1.0f,
+    betaSlow: Float = -1.0f,
     // Original context size
     origCtx: Int = 0
 )
