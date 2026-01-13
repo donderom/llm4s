@@ -101,9 +101,22 @@ enum FlashAttention:
     case On   => FlashAttentionType.ENABLED
     case Off  => FlashAttentionType.DISABLED
 
+enum ContextSize:
+  case Auto
+  case Custom(size: Int)
+
+object ContextSize extends Validation[ContextSize]:
+  val error = "Context size should be positive".left
+
+  def parse(contextSize: ContextSize): Result[ContextSize] =
+    contextSize match
+      case Auto                     => Right(contextSize)
+      case Custom(size) if size > 0 => Right(contextSize)
+      case Custom(_)                => error
+
 final case class ContextParams(
     // Context size
-    size: Int = 4096,
+    size: ContextSize = ContextSize.Auto,
     // Number of threads to use for generation
     threads: Int = Default.threads,
     batch: BatchParams = BatchParams(),
@@ -114,13 +127,14 @@ final case class ContextParams(
 
 object ContextParams extends Validation[ContextParams]:
   def parse(params: ContextParams): Result[ContextParams] =
-    val config =
-      if params.size < 0 then "Context size should be positive".left
-      else if params.threads < 1 then "Context threads should be positive".left
-      else Right(params)
     for
+      _ <- ContextSize.parse(params.size)
+      _ <- Either.cond(
+        params.threads > 0,
+        params,
+        ConfigError("Context threads should be positive")
+      )
       _ <- BatchParams.parse(params.batch)
-      _ <- config
     yield params
 
 final case class Penalty(

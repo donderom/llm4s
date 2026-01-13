@@ -171,7 +171,9 @@ object Llm:
           params: ContextParams
       ): Llama.ContextParams =
         defaultParams.copy(
-          n_ctx = params.size,
+          n_ctx = params.size match
+            case ContextSize.Auto         => 0
+            case ContextSize.Custom(size) => size,
           n_batch = params.batch.logical,
           n_ubatch = params.batch.physical,
           n_threads = params.threads,
