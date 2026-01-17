@@ -85,6 +85,7 @@ object Llm:
         val error = s"Cannot load the model $model"
         for
           llama <- api
+          params <- ModelParams.parse(params)
           path <- Either.cond(
             Files.exists(model),
             model,
@@ -101,7 +102,11 @@ object Llm:
               llama.llama_model_load_from_file(
                 path_model = Ptr.copy(path.toAbsolutePath.toString),
                 params = llama.llama_model_default_params().copy(
-                  n_gpu_layers = params.gpuLayers,
+                  n_gpu_layers = params.gpuLayers match
+                    case GpuLayers.All         => -2
+                    case GpuLayers.Auto        => -1
+                    case GpuLayers.None        => 0
+                    case GpuLayers.Custom(num) => num,
                   main_gpu = params.mainGpu,
                   use_mmap = params.mmap,
                   use_mlock = params.mlock

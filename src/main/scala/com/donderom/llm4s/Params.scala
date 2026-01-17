@@ -34,9 +34,24 @@ object AdapterParams extends Validation[AdapterParams]:
     if Files.exists(params.path) then Right(params)
     else s"LoRA adapter file ${params.path} does not exist".left
 
+enum GpuLayers:
+  case Auto, All, None
+  case Custom(num: Int)
+
+object GpuLayers extends Validation[GpuLayers]:
+  val error = "Number of GPU layers should be positive".left
+
+  def apply(num: Int): GpuLayers = GpuLayers.Custom(num)
+
+  def parse(gpuLayers: GpuLayers): Result[GpuLayers] =
+    gpuLayers match
+      case Auto | All | None        => Right(gpuLayers)
+      case Custom(size) if size > 0 => Right(gpuLayers)
+      case Custom(_)                => error
+
 final case class ModelParams(
     // Number of layers to store in VRAM
-    gpuLayers: Int = -1,
+    gpuLayers: GpuLayers = GpuLayers.Auto,
     // GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
     mainGpu: Int = 0,
     // Use mmap if possible
@@ -46,6 +61,11 @@ final case class ModelParams(
     // Attempt optimizations on some NUMA systems
     numa: NumaStrategy = NumaStrategy.DISABLED
 )
+
+object ModelParams:
+  def parse(params: ModelParams): Result[ModelParams] =
+    for _ <- GpuLayers.parse(params.gpuLayers)
+    yield params
 
 final case class RopeParams(
     scalingType: RopeScalingType = RopeScalingType.UNSPECIFIED,
@@ -107,6 +127,8 @@ enum ContextSize:
 
 object ContextSize extends Validation[ContextSize]:
   val error = "Context size should be positive".left
+
+  def apply(size: Int): ContextSize = ContextSize.Custom(size)
 
   def parse(contextSize: ContextSize): Result[ContextSize] =
     contextSize match
