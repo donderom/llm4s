@@ -316,11 +316,17 @@ object Llama:
       // Booleans
       vocab_only: CBool, // only load the vocabulary, no weights
       use_mmap: CBool, // use mmap if possible
+      use_direct_to: CBool, // use direct io, takes precedence over use_mmap
       use_mlock: CBool, // force system to keep model in RAM
       check_tensors: CBool, // validate model tensor data
       use_extra_bufts: CBool, // use extra buffer types (used for weight repacking)
       no_host: CBool, // bypass host buffer allowing extra buffers to be used
       no_alloc: CBool // only load metadata and simulate memory allocations
+  ) derives Struct
+
+  final case class SamplerSeqConfig(
+      seq_id: SeqId,
+      sampler: Sampler
   ) derives Struct
 
   enum GgmlType(val code: CInt):
@@ -443,7 +449,12 @@ object Llama:
       // use a unified buffer across the input sequences when computing the attention
       // try to disable when n_seq_max > 1 for improved performance when the sequences do not share a large prefix
       // ref: https://github.com/ggml-org/llama.cpp/pull/14363
-      kv_unified: CBool
+      kv_unified: CBool,
+      // [EXPERIMENTAL]
+      // backend sampler chain configuration (make sure the caller keeps the sampler chains alive)
+      // note: the samplers must be sampler chains (i.e. use llama_sampler_chain_init)
+      samplers: Ptr[SamplerSeqConfig],
+      n_samplers: SizeT
   ) derives Struct
 
   final case class ModelQuantizeParams(
@@ -549,6 +560,7 @@ trait Llama derives FSet:
   def llama_model_n_ctx_train(model: Model): CInt
   def llama_model_n_embd(model: Model): CInt
   def llama_model_n_embd_inp(model: Model): CInt
+  def llama_model_n_embd_out(model: Model): CInt
   def llama_model_n_layer(model: Model): CInt
   def llama_model_n_head(model: Model): CInt
   def llama_model_n_head_kv(model: Model): CInt
@@ -642,6 +654,8 @@ trait Llama derives FSet:
   //
 
   // Load a LoRA adapter from file
+  // The adapter is valid as long as the associated model is not freed
+  // All adapters must be loaded before context creation
   def llama_adapter_lora_init(model: Model, path_lora: Ptr[CChar]): LoraAdapter
 
   // Get metadata value as a string by key name
@@ -1023,7 +1037,15 @@ trait Llama derives FSet:
 
   // important: takes ownership of the sampler object and will free it when llama_sampler_free is called
   def llama_sampler_chain_add(chain: Sampler, smpl: Sampler): Unit
+
+  // return NULL if:
+  //   - the sampler is NULL
+  //   - the sampler is not a llama_sampler_chain
+  //   - the index is out of bounds, unless i == -1
+  //   - if i == -1, returns the chain itself (can be used to check if the sampler is a chain)
   def llama_sampler_chain_get(chain: Sampler, i: CInt): Sampler
+
+  // the total number of samplers in the chain
   def llama_sampler_chain_n(chain: Sampler): CInt
 
   // after removing a sampler, the chain will no longer own it, and it will not be freed when the chain is freed
