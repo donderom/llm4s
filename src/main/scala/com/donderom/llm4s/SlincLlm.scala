@@ -90,7 +90,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
       val start =
         if lastTokens.size == ctxSize then ctxSize - 1 else evaluated.toInt
       val ids = lastTokens.slice(start, lastTokens.size).toArray
-      evaluate(ids, past, params.context.batch)
+      evaluate(ids, past)
     end eval
 
     def tokens(state: State[Token]): LazyList[Token] =
@@ -144,7 +144,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
       ids.size,
       if encoder then gen(Evaluated(ids.size))
       else if params.echo then promptTokens(ids) #::: gen(Evaluated.none)
-      else gen(evaluate(ids, Evaluated.none, params.context.batch))
+      else gen(evaluate(ids, Evaluated.none))
     )
   end generate
 
@@ -160,7 +160,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
 
   def embeddings(prompt: String, params: EmbeddingParams): Array[Float] =
     val ids = encode(prompt)
-    val _ = evaluate(ids, Evaluated.none, params.context.batch)
+    val _ = evaluate(ids, Evaluated.none)
     val size = llama.llama_model_n_embd(model)
     val embeddings =
       if params.poolingType == Llama.PoolingType.NONE then
@@ -204,6 +204,8 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
   lazy val vocab: Llama.Vocab = llama.llama_model_get_vocab(model)
   lazy val vocabSize: Int = llama.llama_vocab_n_tokens(vocab)
   lazy val addBos: Boolean = llama.llama_vocab_get_add_bos(vocab)
+  object Batch:
+    lazy val logicalSize = llama.llama_n_batch(ctx)
 
   def nullToken(token: Int): Boolean = token == Llama.nullToken
 
@@ -254,14 +256,10 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
         try decoder.decode(ByteBuffer.wrap(bytes)).toString
         catch case _ => bytes
 
-  def evaluate(
-      ids: Array[Int],
-      past: Evaluated,
-      batch: BatchParams
-  ): Evaluated =
+  def evaluate(ids: Array[Int], past: Evaluated): Evaluated =
     if ids.isEmpty then past
     else
-      val batches = ids.grouped(batch.logical)
+      val batches = ids.grouped(Batch.logicalSize)
       Scope.confined:
         for (batch, n) <- batches.zipWithIndex do
           llama.llama_decode(
