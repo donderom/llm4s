@@ -32,5 +32,5 @@ lazy val root = project
     ),
 
     libraryDependencies += "fr.hammons" %% "slinc-runtime" % "0.6.0",
-    libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.16" % "test",
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test",
   )
