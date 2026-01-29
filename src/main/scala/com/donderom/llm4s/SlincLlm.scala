@@ -113,7 +113,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
               val gen = (stop: Stop.State[Token]) =>
                 tokens(state.regular(newPast, stop))
               stop.step(Token(token, probs), state.stop) match
-                case stop.Action.Cont(st) => gen(st)
+                case stop.Action.Cont(st)               => gen(st)
                 case stop.Action.Emit(chunk: Token, st) =>
                   chunk #:: gen(st)
                 case stop.Action.Emit(chunk: Vector[Token], st) =>
