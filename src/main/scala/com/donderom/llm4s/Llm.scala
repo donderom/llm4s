@@ -135,21 +135,43 @@ object Llm:
           )(error).filterOrElse(notNull, ModelError(error))
         yield ctx
 
+      private final case class LoadedAdapter(
+          adapter: Llama.LoraAdapter,
+          scale: Float
+      )
+      private val loraError = s"Cannot initialize LoRA adapter ($params)"
+
       private def loadLora(
           llm: Llama.Model,
           ctx: Llama.Ctx,
           lora: List[AdapterParams]
       ): Result[Unit] =
-        lora.map(loadAdapter(llm, ctx, _)).foldLeft(Result.unit):
-          case (acc, Right(_)) => acc
-          case (_, failure)    => failure
+        val adapters = lora.map(loadAdapter(llm, _))
+          .foldRight(Right(Nil): Result[List[LoadedAdapter]]) {
+            case (Right(adapter), Right(acc)) => Right(adapter :: acc)
+            case (Left(e), _)                 => Left(e)
+            case (_, Left(e))                 => Left(e)
+          }
+
+        for
+          llama <- api
+          adapters <- adapters
+          _ <- catchNonFatal(
+            if adapters.size > 0 then
+              Scope.confined:
+                llama.llama_set_adapters_lora(
+                  ctx = ctx,
+                  adapters = Ptr.copy(adapters.map(_.adapter).toArray),
+                  n_adapters = SizeT(adapters.size.toShort),
+                  scales = Ptr.copy(adapters.map(_.scale).toArray)
+                )
+          )(loraError)
+        yield ()
 
       private def loadAdapter(
           llm: Llama.Model,
-          ctx: Llama.Ctx,
           params: AdapterParams
-      ): Result[Unit] =
-        val error = s"Cannot initialize LoRA adapter ($params)"
+      ): Result[LoadedAdapter] =
         for
           llama <- api
           config <- AdapterParams.parse(params)
@@ -159,15 +181,8 @@ object Llm:
                 model = llm,
                 path_lora = Ptr.copy(config.path.toAbsolutePath.toString)
               )
-          )(error).filterOrElse(notNull, ModelError(error))
-          _ <- catchNonFatal(
-            llama.llama_set_adapter_lora(
-              ctx = ctx,
-              adapter = adapter,
-              scale = config.scale
-            )
-          )(error)
-        yield ()
+          )(loraError).filterOrElse(notNull, ModelError(loraError))
+        yield LoadedAdapter(adapter, config.scale)
 
       private def llamaParams(
           embedding: Boolean

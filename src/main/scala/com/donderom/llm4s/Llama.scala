@@ -316,7 +316,7 @@ object Llama:
       // Booleans
       vocab_only: CBool, // only load the vocabulary, no weights
       use_mmap: CBool, // use mmap if possible
-      use_direct_to: CBool, // use direct io, takes precedence over use_mmap
+      use_direct_to: CBool, // use direct io, takes precedence over use_mmap when supported
       use_mlock: CBool, // force system to keep model in RAM
       check_tensors: CBool, // validate model tensor data
       use_extra_bufts: CBool, // use extra buffer types (used for weight repacking)
@@ -685,26 +685,19 @@ trait Llama derives FSet:
       buf_size: SizeT
   ): CInt
 
-  // Manually free a LoRA adapter
-  // Note: loaded adapters will be free when the associated model is deleted
-  def llama_adapter_lora_free(adapter: LoraAdapter): Unit
-
   // Get the invocation tokens if the current lora is an alora
   def llama_adapter_get_alora_n_invocation_tokens(adapter: LoraAdapter): CInt
   def llama_adapter_get_alora_invocation_tokens(
       adapter: LoraAdapter
   ): Ptr[Token]
 
-  // Add a loaded LoRA adapter to given context
-  // This will not modify model's weight
-  def llama_set_adapter_lora(ctx: Ctx, adapter: LoraAdapter, scale: Float): CInt
-
-  // Remove a specific LoRA adapter from given context
-  // Return -1 if the adapter is not present in the context
-  def llama_rm_adapter_lora(ctx: Ctx, adapter: LoraAdapter): CInt
-
-  // Remove all LoRA adapters from given context
-  def llama_clear_adapter_lora(ctx: Ctx): Unit
+  // Set LoRa adapters on the context. Will only modify if the adapters currently in context are different.
+  def llama_set_adapters_lora(
+      ctx: Ctx,
+      adapters: Ptr[LoraAdapter],
+      n_adapters: SizeT,
+      scales: Ptr[CFloat]
+  ): CInt
 
   // Apply a loaded control vector to a llama_context, or if data is NULL, clear
   // the currently loaded vector.
@@ -712,7 +705,7 @@ trait Llama derives FSet:
   // to an n_embd x n_layers buffer starting from layer 1.
   // il_start and il_end are the layer range the vector should apply to (both inclusive)
   // See llama_control_vector_load in common to load a control vector.
-  def llama_apply_adapter_cvec(
+  def llama_set_adapter_cvec(
       ctx: Ctx,
       data: Ptr[Float],
       len: SizeT,
@@ -996,9 +989,8 @@ trait Llama derives FSet:
   //
 
   /// Apply chat template. Inspired by hf apply_chat_template() on python.
-  /// Both "model" and "custom_template" are optional, but at least one is required. "custom_template" has higher precedence than "model"
   /// NOTE: This function does not use a jinja parser. It only support a pre-defined list of template. See more: https://github.com/ggml-org/llama.cpp/wiki/Templates-supported-by-llama_chat_apply_template
-  /// @param tmpl A Jinja template to use for this chat. If this is nullptr, the model’s default chat template will be used instead.
+  /// @param tmpl A Jinja template to use for this chat.
   /// @param chat Pointer to a list of multiple llama_chat_message
   /// @param n_msg Number of llama_chat_message in this chat
   /// @param add_ass Whether to end the prompt with the token(s) that indicate the start of an assistant message.
@@ -1020,6 +1012,11 @@ trait Llama derives FSet:
   //
   // Sampling API
   //
+
+  // [EXPERIMENTAL]
+  // attach a sampler to the context
+  // note: prefer initializing the context with llama_context_params.samplers when possible
+  def llama_set_sampler(ctx: Ctx, llama_seq_id: SeqId, smpl: Sampler): CBool
 
   def llama_sampler_init(iface: Ptr[Any], ctx: Ctx): Sampler
   def llama_sampler_name(sampler: Sampler): Ptr[CChar]
@@ -1054,6 +1051,8 @@ trait Llama derives FSet:
   // Available samplers:
 
   def llama_sampler_init_greedy(): Sampler
+
+  // seed == LLAMA_DEFAULT_SEED to use a random seed.
   def llama_sampler_init_dist(seed: CInt): Sampler
 
   /// @details Top-K sampling described in academic paper "The Curious Case of Neural Text Degeneration" https://arxiv.org/abs/1904.09751
@@ -1156,6 +1155,34 @@ trait Llama derives FSet:
       dry_penalty_last_n: CInt,
       seq_breakers: Ptr[Ptr[CChar]],
       num_breakers: SizeT
+  ): Sampler
+
+  /// adaptive-p: select tokens near a configurable target probability over time.
+  ///
+  /// the adaptive-p sampler transforms the token probability distribution to favor tokens
+  /// that fall near a user-configurable probability target.
+  ///
+  /// internally, the sampler maintains an exponential moving average of the *ORIGINAL*
+  /// probabilities of selected tokens at each sampling step. it uses this EMA to compute an
+  /// adapted target probability at each sampling step, thus maintaining the desired target
+  /// probability over time.
+  ///
+  /// adaptive-p selects a token ID rather than just mutating candidates, so it must be last
+  /// in the sampler chain (like mirostat, dist, greedy).
+  ///
+  /// only mild truncation before this sampler is recommended. we suggest applying min-p
+  /// before adaptive-p as the only other active sampler in the chain.
+  ///
+  /// @param target select tokens near this probability (valid range 0.0 to 1.0; negative = disabled)
+  /// @param decay  EMA decay for adaptation; history ≈ 1/(1-decay) tokens (valid range 0.0 - 0.99)
+  /// @param seed   RNG seed
+  ///
+  /// ref: https://github.com/ggml-org/llama.cpp/pull/17927
+  ///
+  def llama_sampler_init_adaptive_p(
+      target: CFloat,
+      decay: CFloat,
+      seed: CInt
   ): Sampler
 
   def llama_sampler_init_logit_bias(
