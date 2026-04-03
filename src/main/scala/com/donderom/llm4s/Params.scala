@@ -194,6 +194,22 @@ final case class Dynatemp(
     exponent: Float = 1.0f
 )
 
+final case class AdaptiveP(target: Option[Float] = None, decay: Float = 0.90f)
+
+object AdaptiveP extends Validation[AdaptiveP]:
+  val targetError = "Valid range for adaptive target is from 0.0 to 1.0".left
+  val decayError =
+    "Valid range for EMA decay for adaptation is from 0.0 to 0.99".left
+
+  def parse(params: AdaptiveP): Result[AdaptiveP] =
+    (params.target, params.decay) match
+      case (Some(target), _) if !inRange(target, 0.0f, 1.0f) => targetError
+      case (_, decay) if !inRange(decay, 0.0f, 0.99f)        => decayError
+      case _                                                 => Right(params)
+
+  private def inRange(num: Float, min: Float, max: Float): Boolean =
+    num >= min && num <= max
+
 enum SamplerType:
   case PENALTIES, DRY, TOP_N_SIGMA, TOP_K, TYPICAL_P, TOP_P, MIN_P, XTC,
     TEMPERATURE
@@ -217,7 +233,8 @@ enum Sampling:
       topNSigma: Option[Float] = None,
       xtc: Xtc = Xtc(),
       temp: Float = Default.temp,
-      dynatemp: Dynatemp = Dynatemp()
+      dynatemp: Dynatemp = Dynatemp(),
+      adaptiveP: Option[AdaptiveP] = None
   )
 
   case Mirostat1(
@@ -241,19 +258,26 @@ enum Sampling:
   )
 
 object Sampling extends Validation[Sampling]:
+  val minKeepError = "MinKeep should be positive".left
+  val topKError = "Top-K should be positive".left
+  val dryPenaltyLastNError = "Dry penalty last n cannot be negative".left
+  val penaltyLastNError = "Penalty last n cannot be negative".left
+
   def parse(params: Sampling): Result[Sampling] =
     params match
       case dist: Sampling.Dist =>
-        if dist.minKeep.fold(false)(_ <= 0) then
-          "MinKeep should be positive".left
-        else if dist.topK.fold(false)(_ <= 0) then
-          "Top-K should be positive".left
-        else if dist.dry.penaltyLastN.fold(false)(_ < -1) then
-          "Dry penalty last n cannot be negative".left
-        else if dist.penalty.lastN.fold(false)(_ < -1) then
-          "Penalty last n cannot be negative".left
-        else Right(params)
+        for
+          _ <- AdaptiveP.parse(dist.adaptiveP.getOrElse(AdaptiveP()))
+          params <- parseDist(dist)
+        yield params
       case _: Mirostat1 | _: Mirostat2 => Right(params)
+
+  private def parseDist(dist: Sampling.Dist): Result[Sampling] =
+    if dist.minKeep.fold(false)(_ <= 0) then minKeepError
+    else if dist.topK.fold(false)(_ <= 0) then topKError
+    else if dist.dry.penaltyLastN.fold(false)(_ < -1) then dryPenaltyLastNError
+    else if dist.penalty.lastN.fold(false)(_ < -1) then penaltyLastNError
+    else Right(dist)
 
 enum Norm:
   case MaxAbsolute

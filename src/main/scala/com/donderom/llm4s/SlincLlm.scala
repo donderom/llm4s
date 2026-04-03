@@ -275,6 +275,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
     val sparams = llama.llama_sampler_chain_default_params()
     val chain = llama.llama_sampler_chain_init(sparams)
     val add = llama.llama_sampler_chain_add(chain, _)
+
     params match
       case config: Sampling.Dist =>
         Scope.confined:
@@ -369,8 +370,17 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                   )
                 )
 
-          if config.greedy then add(llama.llama_sampler_init_greedy())
-          else add(llama.llama_sampler_init_dist(config.seed))
+          (config.greedy, config.adaptiveP) match
+            case (true, _) => add(llama.llama_sampler_init_greedy())
+            case (_, None) => add(llama.llama_sampler_init_dist(config.seed))
+            case (_, Some(adaptiveP)) =>
+              add(
+                llama.llama_sampler_init_adaptive_p(
+                  adaptiveP.target.getOrElse(-1f),
+                  adaptiveP.decay,
+                  config.seed
+                )
+              )
 
       case Sampling.Mirostat1(seed, temp, tau, eta, m) =>
         add(llama.llama_sampler_init_temp(temp))
