@@ -107,6 +107,7 @@ object Llama:
     case MOSTLY_TQ1_0 extends Ftype(36)
     case MOSTLY_TQ2_0 extends Ftype(37)
     case MOSTLY_MXFP4_MOE extends Ftype(38)
+    case MOSTLY_NVFP4 extends Ftype(39)
     case GUESSED extends Ftype(1024)
 
   given Transform[Ftype, CInt](
@@ -144,6 +145,7 @@ object Llama:
       case Ftype.MOSTLY_TQ1_0.code     => Ftype.MOSTLY_TQ1_0
       case Ftype.MOSTLY_TQ2_0.code     => Ftype.MOSTLY_TQ2_0
       case Ftype.MOSTLY_MXFP4_MOE.code => Ftype.MOSTLY_MXFP4_MOE
+      case Ftype.MOSTLY_NVFP4.code     => Ftype.MOSTLY_NVFP4
       case Ftype.GUESSED.code          => Ftype.GUESSED
     ,
     _.code
@@ -362,7 +364,9 @@ object Llama:
     case TQ1_0 extends GgmlType(34)
     case TQ2_0 extends GgmlType(35)
     case MXFP4 extends GgmlType(39)
-    case COUNT extends GgmlType(40)
+    case NVFP4 extends GgmlType(40)
+    case Q1_0 extends GgmlType(41)
+    case COUNT extends GgmlType(42)
 
   given Transform[GgmlType, CInt](
     _ match
@@ -398,6 +402,8 @@ object Llama:
       case GgmlType.TQ1_0.code   => GgmlType.TQ1_0
       case GgmlType.TQ2_0.code   => GgmlType.TQ2_0
       case GgmlType.MXFP4.code   => GgmlType.MXFP4
+      case GgmlType.NVFP4.code   => GgmlType.NVFP4
+      case GgmlType.Q1_0.code    => GgmlType.Q1_0
       case GgmlType.COUNT.code   => GgmlType.COUNT
     ,
     _.code
@@ -457,6 +463,14 @@ object Llama:
       n_samplers: SizeT
   ) derives Struct
 
+  final case class ModelTensorOverride(pattern: Ptr[CChar], `type`: GgmlType)
+
+  final case class ModelImatrixData(
+      name: Ptr[CChar],
+      data: Ptr[CFloat],
+      size: SizeT
+  )
+
   final case class ModelQuantizeParams(
       nthread: CInt, // number of threads to use for quantizing, if <=0 will use std::thread::hardware_concurrency()
       ftype: Ftype, // quantize to this llama_ftype
@@ -467,12 +481,11 @@ object Llama:
       only_copy: CBool, // only copy tensors - ftype, allow_requantize and quantize_output_tensor are ignored
       pure: CBool, // quantize all tensors to the default type
       keep_split: CBool, // quantize to the same number of shards
-      imatrix: Ptr[Any], // pointer to importance matrix data
-      kv_overrides: Ptr[Any], // pointer to vector containing overrides
-      tensor_types: Ptr[Any], // pointer to vector containing tensor types
-      prune_layers: Ptr[
-        Any
-      ] // pointer to vector containing layer indices to prune
+      dry_run: CBool, // calculate and show the final quantization size without performing quantization
+      imatrix: Ptr[ModelImatrixData], // pointer to importance matrix data
+      kv_overrides: Ptr[ModelKvOverride], // pointer to kv overrides
+      tt_overrides: Ptr[ModelTensorOverride], // pointer to tensor overrides
+      prune_layers: Ptr[CInt] // pointer to layer indices to prune
   ) derives Struct
 
   enum NumaStrategy:
