@@ -108,6 +108,7 @@ object Llama:
     case MOSTLY_TQ2_0 extends Ftype(37)
     case MOSTLY_MXFP4_MOE extends Ftype(38)
     case MOSTLY_NVFP4 extends Ftype(39)
+    case MOSTLY_Q1_0 extends Ftype(40)
     case GUESSED extends Ftype(1024)
 
   given Transform[Ftype, CInt](
@@ -146,6 +147,7 @@ object Llama:
       case Ftype.MOSTLY_TQ2_0.code     => Ftype.MOSTLY_TQ2_0
       case Ftype.MOSTLY_MXFP4_MOE.code => Ftype.MOSTLY_MXFP4_MOE
       case Ftype.MOSTLY_NVFP4.code     => Ftype.MOSTLY_NVFP4
+      case Ftype.MOSTLY_Q1_0.code      => Ftype.MOSTLY_Q1_0
       case Ftype.GUESSED.code          => Ftype.GUESSED
     ,
     _.code
@@ -219,9 +221,14 @@ object Llama:
   )
 
   enum SplitMode:
-    case NONE, LAYER, ROW
+    case NONE, LAYER, ROW, TENSOR
 
   given Transform[SplitMode, CInt](SplitMode.fromOrdinal, _.ordinal)
+
+  enum ContextType:
+    case DEFAULT, MTP
+
+  given Transform[ContextType, CInt](ContextType.fromOrdinal, _.ordinal)
 
   final case class TokenData(id: Token, logit: CFloat, p: CFloat) derives Struct
 
@@ -414,9 +421,12 @@ object Llama:
       n_batch: CInt, // logical maximum batch size that can be submitted to llama_decode
       n_ubatch: CInt, // physical maximum batch size
       n_seq_max: CInt, // max number of sequences (i.e. distinct states for recurrent models)
+      n_rs_seq: CInt, // // number of recurrent-state snapshots per seq for rollback (0 = no rollback) [EXPERIMENTAL]
+      n_outputs_max: CInt, // max outputs in a ubatch (0 = n_batch)
       n_threads: CInt, // number of threads to use for generation
       n_threads_batch: CInt, // number of threads to use for batch processing
 
+      ctx_type: ContextType, // set the context type (e.g. MTP)
       rope_scaling_type: RopeScalingType, // RoPE scaling type, from `enum llama_rope_scaling_type`
       pooling_type: PoolingType, // whether to pool (sum) embedding results by sequence id
       attention_type: AttentionType, // attention type to use for embeddings
@@ -562,6 +572,7 @@ trait Llama derives FSet:
   def llama_n_batch(ctx: Ctx): CInt
   def llama_n_ubatch(ctx: Ctx): CInt
   def llama_n_seq_max(ctx: Ctx): CInt
+  def llama_n_rs_seq(ctx: Ctx): CInt
 
   def llama_get_model(ctx: Ctx): Model
   def llama_get_memory(ctx: Ctx): Memory
