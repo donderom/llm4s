@@ -108,8 +108,7 @@ object Llm:
                     case GpuLayers.None        => 0
                     case GpuLayers.Custom(num) => num,
                   main_gpu = params.mainGpu,
-                  use_mmap = params.mmap,
-                  use_mlock = params.mlock
+                  load_mode = params.loadMode
                 )
               )
           )(error).filterOrElse(notNull, ModelError(error))

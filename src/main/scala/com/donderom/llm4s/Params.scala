@@ -3,7 +3,7 @@ package com.donderom.llm4s
 import java.nio.file.{Files, Path}
 
 import LlmError.ConfigError
-import Llama.{FlashAttentionType, NumaStrategy, RopeScalingType}
+import Llama.{FlashAttentionType, LoadMode, NumaStrategy, RopeScalingType}
 
 object Default:
   lazy val threads = Runtime.getRuntime.availableProcessors
@@ -54,10 +54,8 @@ final case class ModelParams(
     gpuLayers: GpuLayers = GpuLayers.Auto,
     // GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
     mainGpu: Int = 0,
-    // Use mmap if possible
-    mmap: Boolean = true,
-    // Force system to keep model in RAM
-    mlock: Boolean = false,
+    // Model load mode
+    loadMode: LoadMode = LoadMode.MMAP,
     // Attempt optimizations on some NUMA systems
     numa: NumaStrategy = NumaStrategy.DISABLED
 )

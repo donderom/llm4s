@@ -225,6 +225,11 @@ object Llama:
 
   given Transform[SplitMode, CInt](SplitMode.fromOrdinal, _.ordinal)
 
+  enum LoadMode:
+    case NONE, MMAP, MLOCK, DIRECT_TO
+
+  given Transform[LoadMode, CInt](LoadMode.fromOrdinal, _.ordinal)
+
   enum ContextType:
     case DEFAULT, MTP
 
@@ -308,6 +313,7 @@ object Llama:
       // number of layers to store in VRAM
       n_gpu_layers: CInt,
       split_mode: SplitMode, // how to split the model across multiple GPUs
+      load_mode: LoadMode, // how to load the model
 
       // the GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
       main_gpu: CInt,
@@ -322,11 +328,8 @@ object Llama:
       // override key-value pairs of the model meta data
       kv_overrides: Ptr[ModelKvOverride],
 
-      // Booleans
+      // Keep the booleans together to avoid misalignment during copy-by-value
       vocab_only: CBool, // only load the vocabulary, no weights
-      use_mmap: CBool, // use mmap if possible
-      use_direct_to: CBool, // use direct io, takes precedence over use_mmap when supported
-      use_mlock: CBool, // force system to keep model in RAM
       check_tensors: CBool, // validate model tensor data
       use_extra_bufts: CBool, // use extra buffer types (used for weight repacking)
       no_host: CBool, // bypass host buffer allowing extra buffers to be used
@@ -515,6 +518,9 @@ object Llama:
 
 trait Llama derives FSet:
   import Llama.*
+
+  def llama_load_mode_name(load_mode: LoadMode): Ptr[CChar]
+  def llama_load_mode_from_str(str: Ptr[CChar]): LoadMode
 
   def llama_model_default_params(): ModelParams
   def llama_context_default_params(): ContextParams
