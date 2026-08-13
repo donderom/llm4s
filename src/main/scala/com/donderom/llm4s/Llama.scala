@@ -226,7 +226,7 @@ object Llama:
   given Transform[SplitMode, CInt](SplitMode.fromOrdinal, _.ordinal)
 
   enum LoadMode:
-    case NONE, MMAP, MLOCK, DIRECT_TO
+    case NONE, MMAP, MLOCK, MMAP_MLOCK, DIRECT_TO
 
   given Transform[LoadMode, CInt](LoadMode.fromOrdinal, _.ordinal)
 
