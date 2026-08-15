@@ -333,7 +333,8 @@ object Llama:
       check_tensors: CBool, // validate model tensor data
       use_extra_bufts: CBool, // use extra buffer types (used for weight repacking)
       no_host: CBool, // bypass host buffer allowing extra buffers to be used
-      no_alloc: CBool // only load metadata and simulate memory allocations
+      no_alloc: CBool, // only load metadata and simulate memory allocations
+      load_mtp: CBool // whether to load MTP layers
   ) derives Struct
 
   final case class SamplerSeqConfig(
