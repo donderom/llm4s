@@ -134,9 +134,9 @@ object Main extends App:
   val prompt = "What is LLM?"
   // Use Flash attention and context size provided by the model
   val params = LlmParams(context = ContextParams(flashAttention = FlashAttention.On))
-  Using(Llm(model)): llm =>                // llm : com.donderom.llm4s.Llm
-   llm(prompt, params).foreach: stream =>  // stream : LazyList[String]
-      stream.foreach: token =>             // token : String
+  Using(Llm(model)): llm =>                 // llm : com.donderom.llm4s.Llm
+    llm(prompt, params).foreach: stream =>  // stream : LazyList[String]
+      stream.foreach: token =>              // token : String
         print(token)
 ```
 
