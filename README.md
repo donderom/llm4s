@@ -15,7 +15,7 @@
 Add `llm4s` to your `build.sbt`:
 
 ```scala
-libraryDependencies += "com.donderom" %% "llm4s" % "0.20.0-b10206"
+libraryDependencies += "com.donderom" %% "llm4s" % "0.21.0-b10258"
 ```
 
 For JDK 17 add `.jvmopts` file in the project root:
@@ -29,7 +29,7 @@ For JDK 17 add `.jvmopts` file in the project root:
 
 * Scala: 3.3.0
 * JDK: 17 or 19
-* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.20.0-b10206` means that it supports the [b10206](https://github.com/ggml-org/llama.cpp/releases/tag/b10206) release). The newer releases are usually supported as well, provided there are no API changes.
+* `llama.cpp`: The version suffix refers to the latest supported `llama.cpp` release (e.g. version `0.21.0-b10258` means that it supports the [b10258](https://github.com/ggml-org/llama.cpp/releases/tag/b10258) release). The newer releases are usually supported as well, provided there are no API changes.
 
 <details>
   <summary>Older versions</summary>
@@ -94,7 +94,7 @@ llm.close()
 //> using jvm adoptium:17
 //> using java-opt --add-modules=jdk.incubator.foreign
 //> using java-opt --enable-native-access=ALL-UNNAMED
-//> using dep com.donderom::llm4s:0.20.0-b10206
+//> using dep com.donderom::llm4s:0.21.0-b10258
 
 import com.donderom.llm4s.Llm
 import java.nio.file.Paths
@@ -122,7 +122,7 @@ scala-cli Run.scala
 //> using jvm adoptium:17
 //> using java-opt --add-modules=jdk.incubator.foreign
 //> using java-opt --enable-native-access=ALL-UNNAMED
-//> using dep com.donderom::llm4s:0.20.0-b10206
+//> using dep com.donderom::llm4s:0.21.0-b10258
 
 import com.donderom.llm4s.{ContextParams, FlashAttention, Llm, LlmParams}
 import java.nio.file.Paths

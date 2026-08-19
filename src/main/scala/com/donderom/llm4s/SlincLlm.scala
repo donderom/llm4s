@@ -363,6 +363,7 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
               case SamplerType.PENALTIES =>
                 add(
                   llama.llama_sampler_init_penalties(
+                    llama.llama_vocab_n_tokens(vocab),
                     config.penalty.lastN.getOrElse(0),
                     config.penalty.repeat.getOrElse(1.0f),
                     config.penalty.frequency.getOrElse(.0f),

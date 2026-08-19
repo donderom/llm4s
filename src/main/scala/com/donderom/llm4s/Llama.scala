@@ -1170,6 +1170,7 @@ trait Llama derives FSet:
 
   /// NOTE: Avoid using on the full vocabulary as searching for repeated tokens can become slow. For example, apply top-k or top-p sampling first.
   def llama_sampler_init_penalties(
+      n_vocab: CInt,
       penalty_last_n: CInt,
       penalty_repeat: CFloat,
       penalty_freq: CFloat,
