@@ -109,6 +109,7 @@ object Llama:
     case MOSTLY_MXFP4_MOE extends Ftype(38)
     case MOSTLY_NVFP4 extends Ftype(39)
     case MOSTLY_Q1_0 extends Ftype(40)
+    case MOSTLY_Q2_0 extends Ftype(41)
     case GUESSED extends Ftype(1024)
 
   given Transform[Ftype, CInt](
@@ -148,6 +149,7 @@ object Llama:
       case Ftype.MOSTLY_MXFP4_MOE.code => Ftype.MOSTLY_MXFP4_MOE
       case Ftype.MOSTLY_NVFP4.code     => Ftype.MOSTLY_NVFP4
       case Ftype.MOSTLY_Q1_0.code      => Ftype.MOSTLY_Q1_0
+      case Ftype.MOSTLY_Q2_0.code      => Ftype.MOSTLY_Q2_0
       case Ftype.GUESSED.code          => Ftype.GUESSED
     ,
     _.code
@@ -377,7 +379,8 @@ object Llama:
     case MXFP4 extends GgmlType(39)
     case NVFP4 extends GgmlType(40)
     case Q1_0 extends GgmlType(41)
-    case COUNT extends GgmlType(42)
+    case Q2_0 extends GgmlType(42)
+    case COUNT extends GgmlType(43)
 
   given Transform[GgmlType, CInt](
     _ match
@@ -415,6 +418,7 @@ object Llama:
       case GgmlType.MXFP4.code   => GgmlType.MXFP4
       case GgmlType.NVFP4.code   => GgmlType.NVFP4
       case GgmlType.Q1_0.code    => GgmlType.Q1_0
+      case GgmlType.Q2_0.code    => GgmlType.Q2_0
       case GgmlType.COUNT.code   => GgmlType.COUNT
     ,
     _.code
@@ -1180,7 +1184,6 @@ trait Llama derives FSet:
   ///  @details DRY sampler, designed by p-e-w, as described in: https://github.com/oobabooga/text-generation-webui/pull/5677, porting Koboldcpp implementation authored by pi6am: https://github.com/LostRuins/koboldcpp/pull/982
   def llama_sampler_init_dry(
       vocab: Vocab,
-      n_ctx_train: CInt,
       dry_multiplier: CFloat,
       dry_base: CFloat,
       dry_allowed_length: CInt,

@@ -176,7 +176,7 @@ final case class Dry(
     // Tokens extending repetitions beyond this receive penalty
     allowedLength: Int = 2,
     // How many tokens to scan for repetitions
-    penaltyLastN: Option[Int] = Some(-1),
+    penaltyLastN: Option[Int] = Some(64),
     // Sequence breakers
     seqBreakers: Seq[Char] = Seq[Char]('\n', ':', '"', '*')
 )
@@ -273,8 +273,8 @@ object Sampling extends Validation[Sampling]:
   private def parseDist(dist: Sampling.Dist): Result[Sampling] =
     if dist.minKeep.fold(false)(_ <= 0) then minKeepError
     else if dist.topK.fold(false)(_ <= 0) then topKError
-    else if dist.dry.penaltyLastN.fold(false)(_ < -1) then dryPenaltyLastNError
-    else if dist.penalty.lastN.fold(false)(_ < -1) then penaltyLastNError
+    else if dist.dry.penaltyLastN.fold(false)(_ < 1) then dryPenaltyLastNError
+    else if dist.penalty.lastN.fold(false)(_ < 1) then penaltyLastNError
     else Right(dist)
 
 enum Norm:

@@ -77,7 +77,7 @@ class StopSpec extends AnyFlatSpec with should.Matchers:
       if remaining != 0 then
         val token = tokens(tokens.size - remaining)
         stop.step(Token(token), state) match
-          case Action.Cont(state) => gen(remaining - 1, state)
+          case Action.Cont(state)               => gen(remaining - 1, state)
           case Action.Emit(chunk: Token, state) =>
             chunk.show #:: gen(remaining - 1, state)
           case Action.Emit(chunk: Vector[Token], state) =>

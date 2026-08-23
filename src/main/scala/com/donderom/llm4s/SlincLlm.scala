@@ -297,7 +297,6 @@ private class SlincLlm private[llm4s] (private[llm4s] val ctx: Llama.Ctx):
                 add(
                   llama.llama_sampler_init_dry(
                     llama.llama_model_get_vocab(model),
-                    llama.llama_model_n_ctx_train(model),
                     config.dry.multiplier.getOrElse(.0f),
                     config.dry.base.getOrElse(.0f),
                     config.dry.allowedLength,
