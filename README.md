@@ -102,6 +102,7 @@ import scala.util.Using
 
 object Main extends App:
   System.load("./build/bin/libllama.dylib")
+  // Path to the downloaded model (models are not downloaded automatically)
   val model = Paths.get("Llama-3.2-3B-Instruct-Q6_K.gguf")
   val prompt = "What is LLM?"
   Using(Llm(model)): llm =>         // llm : com.donderom.llm4s.Llm
@@ -130,10 +131,41 @@ import scala.util.Using
 
 object Main extends App:
   System.load("./build/bin/libllama.dylib")
+  // Path to the downloaded model (models are not downloaded automatically)
   val model = Paths.get("gpt-oss-20b-mxfp4.gguf")
   val prompt = "What is LLM?"
   // Use Flash attention and context size provided by the model
   val params = LlmParams(context = ContextParams(flashAttention = FlashAttention.On))
+  Using(Llm(model)): llm =>                 // llm : com.donderom.llm4s.Llm
+    llm(prompt, params).foreach: stream =>  // stream : LazyList[String]
+      stream.foreach: token =>              // token : String
+        print(token)
+```
+
+#### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) example (with configured [Qwen3.8](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF) model using recommended settings):
+
+`Run.scala`:
+```scala
+//> using scala 3.3.0
+//> using jvm adoptium:17
+//> using java-opt --add-modules=jdk.incubator.foreign
+//> using java-opt --enable-native-access=ALL-UNNAMED
+//> using dep com.donderom::llm4s:0.22.0-b10273
+
+import com.donderom.llm4s.{ContextParams, FlashAttention, Llm, LlmParams, Sampling}
+import java.nio.file.Paths
+import scala.util.Using
+
+object Main extends App:
+  System.load("./build/bin/libllama.dylib")
+  // Path to the downloaded model (models are not downloaded automatically)
+  val model = Paths.get("Qwen3.8-27B-Q4_1.gguf")
+  val prompt = "What is LLM?"
+  // Use Flash attention and sampling parameters for instruct mode
+  val params = LlmParams(
+    context = ContextParams(flashAttention = FlashAttention.On),
+    sampling = Sampling.Dist(temp = 0.7, topK = Some(20), minP = None)
+  )
   Using(Llm(model)): llm =>                 // llm : com.donderom.llm4s.Llm
     llm(prompt, params).foreach: stream =>  // stream : LazyList[String]
       stream.foreach: token =>              // token : String
