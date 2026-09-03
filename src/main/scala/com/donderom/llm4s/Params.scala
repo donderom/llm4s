@@ -17,10 +17,15 @@ object Default:
     // Learning rate
     val eta: Float = .1f
 
+/** Params to configure a LoRA adapter.
+  *
+  * @param path
+  *   path to LoRA adapter GGUF file
+  * @param scale
+  *   custom scaling of the LoRA adapter. Defaults to 1.0.
+  */
 final case class AdapterParams(
-    // Path to LoRA adapter GGUF file
     path: Path,
-    // Custom scaling of the LoRA adapter
     scale: Float = 1.0f
 )
 
@@ -34,6 +39,8 @@ object AdapterParams extends Validation[AdapterParams]:
     if Files.exists(params.path) then Right(params)
     else s"LoRA adapter file ${params.path} does not exist".left
 
+/** Number of layers to store in VRAM.
+  */
 enum GpuLayers:
   case Auto, All, None
   case Custom(num: Int)
@@ -49,14 +56,22 @@ object GpuLayers extends Validation[GpuLayers]:
       case Custom(size) if size > 0 => Right(gpuLayers)
       case Custom(_)                => error
 
+/** Params controlling llama.cpp model.
+  *
+  * @param gpuLayers
+  *   number of [[GpuLayers]] to store in VRAM. Defaults to auto.
+  * @param mainGpu
+  *   GPU that is used for the entire model when split_mode is
+  *   LLAMA_SPLIT_MODE_NONE. Defaults to 0.
+  * @param loadMode
+  *   model [[Llama.LoadMode]]. Defaults to MMAP.
+  * @param numa
+  *   [[Llama.NumaStrategy]] optimization. Defaults to disabled.
+  */
 final case class ModelParams(
-    // Number of layers to store in VRAM
     gpuLayers: GpuLayers = GpuLayers.Auto,
-    // GPU that is used for the entire model when split_mode is LLAMA_SPLIT_MODE_NONE
     mainGpu: Int = 0,
-    // Model load mode
     loadMode: LoadMode = LoadMode.MMAP,
-    // Attempt optimizations on some NUMA systems
     numa: NumaStrategy = NumaStrategy.DISABLED
 )
 
@@ -65,33 +80,57 @@ object ModelParams:
     for _ <- GpuLayers.parse(params.gpuLayers)
     yield params
 
+/** RoPE params.
+  *
+  * @param scalingType
+  *   RoPE scaling type [[Llama.RopeScalingType]]. Defaults to unspecified.
+  * @param freqBase
+  *   RoPE base frequency used by NTK-aware scaling. Defaults to model derived
+  *   value.
+  * @param freqScale
+  *   RoPE frequency scaling factor, expands context by a factor of 1/N.
+  *   Defaults to model derived value.
+  */
 final case class RopeParams(
     scalingType: RopeScalingType = RopeScalingType.UNSPECIFIED,
-    // RoPE base frequency, used by NTK-aware scaling
     freqBase: Float = 0.0f,
-    // RoPE frequency scaling factor, expands context by a factor of 1/N
     freqScale: Float = 0.0f
 )
 
+/** YaRN params.
+  *
+  * @param extFactor
+  *   YaRN extrapolation mix factor. Defaults to model derived value.
+  * @param attnFactor
+  *   YaRN magnitude scaling factor. Defaults to -1.
+  * @param betaFast
+  *   YaRN low correction dim. Defaults to -1.
+  * @param betaSlow
+  *   YaRN high correction dim. Defaults to -1.
+  * @param origCtx
+  *   YaRN original context size. Defaults to 0.
+  */
 final case class YarnParams(
-    // Extrapolation mix factor
     extFactor: Float = -1.0f,
-    // Magnitude scaling factor
     attnFactor: Float = -1.0f,
-    // Low correction dim
     betaFast: Float = -1.0f,
-    // High correction dim
     betaSlow: Float = -1.0f,
-    // Original context size
     origCtx: Int = 0
 )
 
+/** Batch params.
+  *
+  * @param logical
+  *   maximum logical batch size. Defaults to 2048.
+  * @param physical
+  *   maximum physical batch size. Defaults to 512.
+  * @param threads
+  *   number of threads to use for batch processing. Defaults to available
+  *   cores.
+  */
 final case class BatchParams(
-    // Logical maximum batch size
     logical: Int = 2048,
-    // Physical maximum batch size
     physical: Int = 512,
-    // Number of threads to use for batch processing
     threads: Int = Default.threads
 )
 
@@ -102,6 +141,13 @@ object BatchParams extends Validation[BatchParams]:
     else if params.threads < 1 then "Batch threads should be positive".left
     else Right(params)
 
+/** Group attention params.
+  *
+  * @param factor
+  *   group attention factor. Defaults to 1.
+  * @param width
+  *   group attention width. Defaults to 512.
+  */
 final case class GroupAttention(factor: Int = 1, width: Int = 512)
 
 object GroupAttention extends Validation[GroupAttention]:
@@ -111,6 +157,8 @@ object GroupAttention extends Validation[GroupAttention]:
       "Group attention width should be a multiple of factor".left
     else Right(params)
 
+/** Flash attention type.
+  */
 enum FlashAttention:
   case Auto, On, Off
 
@@ -119,6 +167,8 @@ enum FlashAttention:
     case On   => FlashAttentionType.ENABLED
     case Off  => FlashAttentionType.DISABLED
 
+/** Context size.
+  */
 enum ContextSize:
   case Auto
   case Custom(size: Int)
@@ -134,10 +184,23 @@ object ContextSize extends Validation[ContextSize]:
       case Custom(size) if size > 0 => Right(contextSize)
       case Custom(_)                => error
 
+/** Params controlling llama.cpp context
+  *
+  * @param size
+  *   [[ContextSize]]. Defaults to auto.
+  * @param threads
+  *   number of threads to use for generation. Defaults to available cores.
+  * @param batch
+  *   batch related params [[BatchParams]]
+  * @param rope
+  *   RoPE related params [[RopeParams]]
+  * @param yarn
+  *   YaRN related params [[YarnParams]]
+  * @param flashAttention
+  *   controls the usage of [[FlashAttention]]. Defaults to auto.
+  */
 final case class ContextParams(
-    // Context size
     size: ContextSize = ContextSize.Auto,
-    // Number of threads to use for generation
     threads: Int = Default.threads,
     batch: BatchParams = BatchParams(),
     rope: RopeParams = RopeParams(),
@@ -157,41 +220,81 @@ object ContextParams extends Validation[ContextParams]:
       _ <- BatchParams.parse(params.batch)
     yield params
 
+/** Penalty sampling params.
+  *
+  * @param lastN
+  *   last n tokens to penalize. Defaults to 64.
+  * @param repeat
+  *   penalize repeat sequence of tokens. Defaults to disabled.
+  * @param frequency
+  *   repeat alpha frequency penalty. Defaults to disabled.
+  * @param presence
+  *   repeat alpha presence penalty. Defaults to disabled.
+  */
 final case class Penalty(
-    // Last n tokens to penalize
     lastN: Option[Int] = Some(64),
-    // Penalize repeat sequence of tokens
     repeat: Option[Float] = None,
-    // Repeat alpha frequency penalty
     frequency: Option[Float] = None,
-    // Repeat alpha presence penalty
     presence: Option[Float] = None
 )
 
+/** DRY sampling params.
+  *
+  * @param multiplier
+  *   DRY repetition penalty for tokens extending repetition. Defaults to
+  *   disabled.
+  * @param base
+  *   multiplier * base ^ (length of sequence before token - allowed length).
+  *   Defaults to 1.75.
+  * @param allowedLength
+  *   tokens extending repetitions beyond this receive penalty. Defaults to 2.
+  * @param penaltyLastN
+  *   how many tokens to scan for repetitions. Defaults to 64.
+  * @param seqBreakers
+  *   sequence breakers. Defaults to `\n`, `:`, `"`, and `*`.
+  */
 final case class Dry(
-    // DRY repetition penalty for tokens extending repetition
     multiplier: Option[Float] = None,
-    // multiplier * base ^ (length of sequence before token - allowed length)
     base: Option[Float] = Some(1.75f),
-    // Tokens extending repetitions beyond this receive penalty
     allowedLength: Int = 2,
-    // How many tokens to scan for repetitions
     penaltyLastN: Option[Int] = Some(64),
-    // Sequence breakers
     seqBreakers: Seq[Char] = Seq[Char]('\n', ':', '"', '*')
 )
 
+/** XTC sampling params.
+  *
+  * @param probability
+  *   XTC probability. Defaults to disabled.
+  * @param threshold
+  *   XTC threshold. Defaults to 0.10.
+  */
 final case class Xtc(
     probability: Option[Float] = None,
     threshold: Option[Float] = Some(0.10f)
 )
 
+/** Dynamic temperature sampling params.
+  *
+  * @param range
+  *   dynatemp range. Defaults to disabled.
+  * @param exponent
+  *   controls how entropy maps to temperature in dynamic temperature sampler.
+  *   Defaults to 1.
+  */
 final case class Dynatemp(
     range: Option[Float] = None,
-    // Controls how entropy maps to temperature in dynamic temperature sampler
     exponent: Float = 1.0f
 )
 
+/** Adaptive-p sampling params.
+  *
+  * @param target
+  *   select tokens near this probability (valid range 0.0 to 1.0). Defaults to
+  *   disabled.
+  * @param decay
+  *   EMA decay for adaptation; history ≈ 1/(1-decay) tokens (valid range 0.0 to
+  *   0.99). Defaults to 0.9.
+  */
 final case class AdaptiveP(target: Option[Float] = None, decay: Float = 0.90f)
 
 object AdaptiveP extends Validation[AdaptiveP]:
@@ -208,21 +311,59 @@ object AdaptiveP extends Validation[AdaptiveP]:
   private def inRange(num: Float, min: Float, max: Float): Boolean =
     num >= min && num <= max
 
+/** Sampler type.
+  */
 enum SamplerType:
   case PENALTIES, DRY, TOP_N_SIGMA, TOP_K, TYPICAL_P, TOP_P, MIN_P, XTC,
     TEMPERATURE
 
+/** Sampling algorithm.
+  */
 enum Sampling:
+  /** Default sampling type.
+    *
+    * @param greedy
+    *   whether to use greedy sampler. Defaults to false.
+    * @param samplers
+    *   list of samplers to apply (order is important). Defaults to
+    *   [[SamplerType]]s: `PENALTIES` → `DRY` → `TOP_N_SIGMA` → `TOP_K` →
+    *   `TYPICAL_P` → `TOP_P` → `MIN_P` → `XTC` → `TEMPERATURE`.
+    * @param seed
+    *   RNG seed
+    * @param logitBias
+    *   map of logit biases. Defaults to none.
+    * @param penalty
+    *   configuration [[Penalty]] configuration
+    * @param dry
+    *   [[Dry]] configuration
+    * @param minKeep
+    *   minimum number of tokens for samplers to return. Defaults to none.
+    * @param topK
+    *   Top-K sampling value. Defaults to 40.
+    * @param typicalP
+    *   Locally Typical sampling value. Defaults to none.
+    * @param topP
+    *   nucleus sampling value. Defaults to 0.95.
+    * @param minP
+    *   ninimum P sampling value. Defaults to 0.05.
+    * @param topNSigma
+    *   top n sigma value. Defaults to none.
+    * @param xtc
+    *   configuration [[Xtc]] configuration
+    * @param temp
+    *   sampling temperature. Defaults to 0.8.
+    * @param dynatemp
+    *   dynamic temperature [[Dynatemp]] configuration
+    * @param adaptiveP
+    *   adaptive-P [[AdaptiveP]] configuration. Defaults to none.
+    */
   case Dist(
-      // Whether to use greedy sampler
       greedy: Boolean = false,
-      // List of samplers to apply (order is important)
       samplers: List[SamplerType] = SamplerType.values.toList,
       seed: Int = Default.seed,
       logitBias: Map[Int, Float] = Map(),
       penalty: Penalty = Penalty(),
       dry: Dry = Dry(),
-      // Minimum number of tokens for samplers to to return
       minKeep: Option[Short] = None,
       topK: Option[Int] = Some(40),
       typicalP: Option[Float] = None,
@@ -235,23 +376,42 @@ enum Sampling:
       adaptiveP: Option[AdaptiveP] = None
   )
 
+  /** Mirostat 1.0 sampling algorithm.
+    *
+    * @param seed
+    *   RNG seed
+    * @param temp
+    *   sampling temperature
+    * @param tau
+    *   target entropy
+    * @param eta
+    *   learning rate
+    * @param m
+    *   maximum cross-entropy
+    */
   case Mirostat1(
       seed: Int = Default.seed,
       temp: Float = Default.temp,
-      // Target entropy
       tau: Float = Default.Mirostat.tau,
-      // Learning rate
       eta: Float = Default.Mirostat.eta,
-      // Maximum cross-entropy
       m: Int = 100
   )
 
+  /** Mirostat 2.0 sampling algorithm.
+    *
+    * @param seed
+    *   RNG seed
+    * @param temp
+    *   sampling temperature
+    * @param tau
+    *   target entropy
+    * @param eta
+    *   learning rate
+    */
   case Mirostat2(
       seed: Int = Default.seed,
       temp: Float = Default.temp,
-      // Target entropy
       tau: Float = Default.Mirostat.tau,
-      // Learning rate
       eta: Float = Default.Mirostat.eta
   )
 
@@ -277,16 +437,26 @@ object Sampling extends Validation[Sampling]:
     else if dist.penalty.lastN.fold(false)(_ < 1) then penaltyLastNError
     else Right(dist)
 
+/** Embedding normalization type.
+  */
 enum Norm:
   case MaxAbsolute
   case Taxicab
   case Euclidean
   case PNorm(p: Int)
 
+/** Params controlling embeddings generation.
+  *
+  * @param context
+  *   [[ContextParams]]
+  * @param poolingType
+  *   [[Llama.PoolingType]] for embeddings
+  * @param norm
+  *   [[Norm]]alization type
+  */
 final case class EmbeddingParams(
     context: ContextParams = ContextParams(),
     poolingType: Llama.PoolingType = Llama.PoolingType.NONE,
-    // Normalisation for embeddings
     norm: Option[Norm] = None
 )
 
@@ -295,21 +465,36 @@ object EmbeddingParams:
     for _ <- ContextParams.parse(params.context)
     yield params
 
+/** An entry point for LLM configuration.
+  *
+  * @param context
+  *   [[ContextParams]] such as context size, batch sizes, attention type, etc.
+  * @param sampling
+  *   params controlling [[Sampling]]
+  * @param predictTokens
+  *   number of tokens to predict. Defaults to unlimited.
+  * @param keepTokens
+  *   number of tokens to keep from the initial prompt. Defaults to 0.
+  * @param suffix
+  *   optional suffix appended to generated text. Defaults to none.
+  * @param echo
+  *   whether to return prompt. Defaults to true.
+  * @param stopSeqs
+  *   list of stop sequences. Defaults to none.
+  * @param groupAttention
+  *   [[GroupAttention]] configuration
+  * @param lora
+  *   list of LoRA adapters [[AdapterParams]]. Defaults to none.
+  */
 final case class LlmParams(
     context: ContextParams = ContextParams(),
     sampling: Sampling = Sampling.Dist(),
-    // Number of tokens to predict
     predictTokens: Option[Int] = None,
-    // Number of tokens to keep from the initial prompt
     keepTokens: Int = 0,
-    // Optional suffix appended to generated text
     suffix: Option[String] = None,
-    // Whether to return prompt
     echo: Boolean = true,
-    // List of stop sequences
     stopSeqs: List[String] = Nil,
     groupAttention: GroupAttention = GroupAttention(),
-    // List of LoRA adapters
     lora: List[AdapterParams] = Nil
 )
 
