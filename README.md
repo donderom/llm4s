@@ -1,6 +1,7 @@
 ## llm4s
 
 [![Maven Central Version](https://img.shields.io/maven-central/v/com.donderom/llm4s_3?style=flat-square&logo=scala&color=dbf1ff)](https://central.sonatype.com/artifact/com.donderom/llm4s_3)
+[![Scaladoc](https://img.shields.io/badge/docs-API-ffe4d6?style=flat-square&logo=scala)](https://javadoc.io/doc/com.donderom/llm4s_3/latest/index.html)
 [![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/donderom/llm4s/ci.yml?style=flat-square&logo=github&color=f1fadf)](https://github.com/donderom/llm4s/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-f2edff?style=flat-square)](https://github.com/donderom/llm4s/blob/main/LICENSE)
 
