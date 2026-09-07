@@ -87,7 +87,9 @@ llm.embeddings(prompt).foreach: embeddings =>
 llm.close()
 ```
 
-#### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) example (with basic [Llama 3](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF) model):
+### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) examples
+
+#### Basic [Llama 3](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF) model
 
 `Run.scala`:
 ```scala
@@ -116,7 +118,7 @@ object Main extends App:
 scala-cli Run.scala
 ```
 
-#### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) example (with configured [gpt-oss](https://huggingface.co/ggml-org/gpt-oss-20b-GGUF) model):
+#### Configured [gpt-oss](https://huggingface.co/ggml-org/gpt-oss-20b-GGUF) model
 
 `Run.scala`:
 ```scala
@@ -143,7 +145,11 @@ object Main extends App:
         print(token)
 ```
 
-#### Self-contained [Scala CLI](https://scala-cli.virtuslab.org) example (with configured [Qwen3.8](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF) model using recommended settings):
+```sh
+scala-cli Run.scala
+```
+
+#### Configured [Qwen3.8](https://huggingface.co/unsloth/Qwen3.8-27B-GGUF) model using recommended settings
 
 `Run.scala`:
 ```scala
