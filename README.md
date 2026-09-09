@@ -182,3 +182,13 @@ object Main extends App:
 ```sh
 scala-cli Run.scala
 ```
+
+### Configuration
+
+Apart from the model path, the examples above differ in what configuration params passed to the model.
+
+There are three entry points for configuring the model:
+
+* [ModelParams](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/ModelParams.html) are passed once when an [Llm](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/Llm$.html#apply-fffffa5f) is instantiated
+* [LlmParams](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/LlmParams.html) containing most of parameters which are optionally passed to every [generation](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/Llm.html#generate-b08) along with the prompt
+* [EmbeddingParams](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/EmbeddingParams.html) are used for generating [embeddings](https://javadoc.io/static/com.donderom/llm4s_3/0.22.1-b10273/com/donderom/llm4s/Llm.html#embeddings-9de)
